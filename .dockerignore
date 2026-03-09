@@ -1,0 +1,8 @@
+node_modules
+.next
+.env
+.env.local
+*.ps1
+test-engine.ps1
+scripts/
+.git

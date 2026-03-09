@@ -1,0 +1,136 @@
+Design direction (recommended)
+
+Theme: Modern Clinical Ops
+Vibe: calm, sharp, high-trust, executive-friendly. Lots of white space, soft surfaces, crisp typography, subtle depth.
+
+Key principles:
+
+Slate neutrals (not pure gray) for a modern look
+
+One strong brand blue for focus + CTAs
+
+Severity colors are muted but clear (no neon)
+
+Cards look like “control panels,” not “tiles”
+
+Color palette (Light mode tokens)
+
+Use these as Figma Variables.
+
+Neutrals
+
+bg/primary #F8FAFC
+
+bg/secondary #F1F5F9
+
+surface/primary #FFFFFF
+
+surface/raised #FFFFFF
+
+border/subtle #E2E8F0
+
+border/strong #CBD5E1
+
+text/primary #0F172A
+
+text/secondary #334155
+
+text/tertiary #64748B
+
+text/inverse #FFFFFF
+
+Brand (deep blue, “trust”)
+
+brand/primary #1D4ED8
+
+brand/hover #1E40AF
+
+brand/soft #DBEAFE
+
+brand/outline #93C5FD
+
+Semantic / status
+
+success #16A34A (soft bg #DCFCE7)
+
+warning #D97706 (soft bg #FFEDD5)
+
+error #DC2626 (soft bg #FEE2E2)
+
+info #0284C7 (soft bg #E0F2FE)
+
+Severity badges (match your “High/Med/Low”)
+
+High: text #991B1B, bg #FEE2E2
+
+Med: text #92400E, bg #FFEDD5
+
+Low: text #1E3A8A, bg #DBEAFE
+
+Optional “Data Confidence” color
+
+High confidence: success
+
+Medium confidence: warning
+
+Low confidence: error (but keep copy gentle: “Decision risk”)
+
+Optional: Dark mode tokens (nice-to-have)
+
+If you want a modern feel, dark mode is a flex.
+
+bg/primary #0B1220
+
+surface/primary #0F172A
+
+surface/raised #111C33
+
+border/subtle #1E293B
+
+text/primary #E2E8F0
+
+text/secondary #94A3B8
+
+brand/primary #60A5FA
+
+brand/soft #0B2A66
+
+Typography + layout polish
+
+Typeface: Inter
+
+Add tight tracking for headings (−1% to −2%)
+
+Use tabular numerals for KPIs (monospace-like alignment)
+
+12-column grid, max content width 1200–1280 inside 1440 frame
+
+Spacing: 8pt system (8/16/24/32)
+
+Components styling (to look modern)
+
+Cards: radius 12, border 1px #E2E8F0, shadow:
+
+shadow/sm: 0 1 2 0 rgba(15,23,42,0.06)
+
+shadow/md: 0 8 20 -12 rgba(15,23,42,0.25)
+
+Buttons:
+
+Primary: brand blue fill, white text
+
+Secondary: white surface + border
+
+Tertiary: text button, subtle hover bg
+
+Tables: compact, sticky header, subtle zebra optional (very light: #F8FAFC)
+
+Data viz style (so charts don’t look cheap)
+
+Minimal gridlines (border/subtle)
+
+1 highlight color (brand) + neutrals
+
+Tooltips: dark surface with white text
+
+Sparklines: thin stroke, no heavy fills

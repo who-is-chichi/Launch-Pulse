@@ -1,0 +1,167 @@
+Design a modern enterprise SaaS web app called “Launch Pulse” (Commercial Launch Insights Platform). Create a complete UI kit + 6 key screens using a clean, high-trust B2B aesthetic (think modern healthcare / analytics tools). The product ingests commercial launch data and generates daily strategic insights + recommended actions, and tracks impact over time.
+
+STYLE / DESIGN SYSTEM
+- Layout: desktop-first responsive web app, 1440px width frames (also include one 768px tablet variant for main pages).
+- Visual tone: crisp, analytical, executive-ready, not flashy. Lots of white space, thin dividers, soft shadows, high legibility.
+- Color palette: neutral grayscale UI with one primary accent (deep blue) and semantic colors for status (green/yellow/red). Keep contrast accessible.
+- Typography: use a modern sans (Inter). Hierarchy:
+  - Page title 24/28 semibold
+  - Section headers 16/24 semibold
+  - Body 14/20 regular
+  - Microcopy 12/16
+- Components should be created as reusable Figma components with variants for states: default/hover/active/disabled; success/warning/error; loading skeletons.
+- Icon style: simple line icons (use placeholders).
+- Create variables / styles for: colors, spacing (4/8/12/16/24/32), radii (8/12), shadows, typography.
+
+INFORMATION ARCHITECTURE
+The app has 4 pillars of launch monitoring:
+1) Demand (Claims)
+2) Access & Fulfillment (Dispense, Shipments, SP Cases)
+3) Field Execution (Calls)
+4) Structure (HCP/HCO master, affiliations, territories)
+
+Users consume:
+- Daily Launch Pulse Brief (top changes + why + what to do)
+- Insights Explorer (all insights with drilldown)
+- Actions & Impact Tracker (assigned actions + did it work)
+- Data & Mapping (admin-only minimal area)
+
+GLOBAL APP SHELL (create as a component)
+- Left sidebar nav with logo “Launch Pulse”, and nav items:
+  - Launch Pulse (Home)
+  - Insights
+  - Actions & Impact
+  - Data & Mapping (admin)
+  - Settings
+- Top bar includes:
+  - Global filters: Brand dropdown, Time window (Last 7 days / Last 4 weeks / Custom), Geography dropdown (Nation / Region / Territory), Data drop selector (Latest run)
+  - Search bar (“Search insights, accounts, territories”)
+  - Notification bell (alerts)
+  - User menu
+- Main content area uses a 12-column grid.
+
+DATA OBJECTS (use consistent UI terms; avoid “QA” language)
+Call insights “Headlines” and “Insights” (not “monitor alerts”).
+Every insight should show: Headline, Pillar tag, Severity, Confidence, Impact, Driver hypothesis, Recommended action, Owner role, Evidence preview.
+Use a “Decision Risk” label when confidence is low or structural shifts are detected.
+
+CREATE THESE SCREENS (6 DESKTOP FRAMES + 2 TABLET FRAMES)
+1) LOGIN (simple)
+- Title: “Welcome to Launch Pulse”
+- Email/password + SSO button
+- Small subtext about secure access
+
+2) HOME — “Launch Pulse”
+Goal: executive snapshot + daily brief.
+Layout:
+- Page title: “Launch Pulse”
+- Subtitle: “Daily strategic changes across Demand, Access, Execution, and Structure”
+- Top row KPI strip (4 tiles): Demand Momentum, Access Friction, Execution Coverage, Data Confidence
+  - Each tile: value, delta vs baseline, small sparkline
+- Section A: “Today’s Headlines” (ranked list of 5)
+  - Each row shows: severity dot, headline text, pillar tag, impacted region/territory, impact score, confidence score, quick actions (Assign / Export / View)
+  - Clicking opens a right-side drawer with detail (see detail template below)
+- Section B: “Driver Breakdown” visualization
+  - A stacked bar or quadrant-style view that attributes changes to Execution vs Access vs Supply vs Structure (use placeholder visuals)
+- Section C: “What to Do Next” (Action recommendations)
+  - 3–5 recommended actions with owner role suggestions and expected lag (“Expect effect in 1–2 weeks”)
+- Section D: “Decision Risk” panel
+  - Items like “Territory shifts driven by alignment update” or “Claims feed lag detected — treat NRx cautiously”
+- Footer: “Last data drop: YYYY-MM-DD 06:10 ET” and dataset freshness badges.
+
+3) INSIGHTS — “Insights Explorer”
+Goal: searchable/filterable insight library.
+Layout:
+- Page title: “Insights”
+- Left filter panel:
+  - Pillar (Demand/Access/Execution/Structure)
+  - Severity (High/Med/Low)
+  - Confidence (High/Med/Low)
+  - Geography (Region/Territory)
+  - Entity type (HCP/Account/Parent System)
+  - Insight template type (dropdown of 12 templates)
+- Main list/table of insights (rows):
+  - Columns: Headline, Pillar, Severity, Confidence, Impact, Where, Generated date, Status (New/Investigating/Actioned/Monitoring)
+- Row click opens Insight Detail page (screen 4) or a drawer preview.
+- Include bulk actions: Export, Assign owner, Mark as monitoring.
+
+4) INSIGHT DETAIL (deep dive)
+Goal: defensible evidence + recommended actions.
+Layout:
+- Header: headline + tags (pillar, severity, confidence) + action buttons (Assign, Export slide, Share)
+- Section: “What changed”
+  - Metric tiles with before/after values and deltas
+- Section: “Where it changed”
+  - Breakdown table: top territories/accounts/parent systems contributing to change
+- Section: “Why it changed (driver hypothesis)”
+  - Show 3 ranked drivers with confidence bars:
+    - Execution (calls coverage)
+    - Access/Fulfillment (SP cycle time, dispense)
+    - Supply/Channel (shipments)
+    - Structure (alignment/affiliation changes)
+- Evidence module:
+  - Trend chart placeholders (no real chart library needed; design frames)
+  - Data sources used badges (Claims / Dispense / Shipments / SP / Calls / Structure)
+- Section: “Recommended actions”
+  - 2–4 actions with: owner role, due date suggestion, expected lag, and “create action item” CTA
+- Section: “Notes & Decisions”
+  - Comments timeline for team collaboration
+
+5) ACTIONS & IMPACT
+Goal: turn insights into ownership + measure outcomes.
+Layout:
+- Page title: “Actions & Impact”
+- Tabs: “Action Board” and “Impact Scorecards”
+Action Board:
+- Kanban columns: New, In Progress, Blocked, Done
+- Action cards show: action title, linked insight, owner, due date, severity, expected lag, status
+Impact Scorecards:
+- For each completed action, show a before/after snapshot:
+  - Outcome metrics (e.g., coverage, SP cycle time, dispense trend)
+  - “Did it move as expected?” badge (Yes/Partial/No)
+  - Link back to originating insight
+Include a “Create action manually” button.
+
+6) DATA & MAPPING (ADMIN)
+Goal: minimal but clear operational control.
+Layout:
+- Page title: “Data & Mapping”
+- Section: “Latest Drop Status”
+  - Table listing datasets: claims_weekly, dispense_weekly, shipments_weekly, sp_cases, calls, hcp_master, account_master, affiliations, territory_alignment, rep_roster, product_dim
+  - Columns: last run time, freshness, coverage, notes
+- Section: “Mapping Configurations”
+  - List of mappings by dataset with status (Configured / Needs review)
+  - Button: “Upload mapping JSON/YAML” and “Test mapping on sample file”
+- Section: “Normalization Rules”
+  - SP status mapping editor (value mapping table)
+  - ID crosswalk status (NPI coverage percent)
+- Include non-technical language wherever possible; reserve technical details for expandable panels.
+
+COMPONENTS TO BUILD (as reusable components)
+- Sidebar nav item (default/active)
+- Top bar filter chips + dropdowns
+- Pillar tag (Demand/Access/Execution/Structure)
+- Severity badge (High/Med/Low)
+- Confidence badge + tooltip explaining it
+- Insight row item
+- Insight drawer (right panel)
+- KPI tile with sparkline placeholder
+- Recommendation/action item component
+- Table styles (striped + compact)
+- Empty states (no insights today; no actions assigned)
+- Loading skeletons for lists and tiles
+- Export modal (“Export Launch Pulse Pack”: PDF / PPTX / Email)
+
+CONTENT (use realistic placeholder copy and sample values)
+- Use example headlines like:
+  - “NRx down 12% WoW in Northeast; driven by 3 parent systems; not alignment-driven”
+  - “SP ‘Pending Outreach’ backlog up 18%; median time-to-first-dispense +3 days”
+  - “Coverage down 20% for top-decile targets in Territory T12; likely execution gap”
+  - “Territory trend shift mostly explained by alignment update; decision risk flagged”
+- Use consistent timestamps and run dates.
+- Use a sample brand name “ONC-101” and regions like Northeast, Midwest, Southwest, West.
+
+DELIVERABLES
+- Create a page in Figma called “Launch Pulse – Design System” with colors, typography, components.
+- Create a page called “Launch Pulse – Screens” with the 6 screens.
+- Ensure everything is componentized and uses styles/variables for easy iteration.

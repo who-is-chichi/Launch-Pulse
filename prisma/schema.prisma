@@ -1,0 +1,227 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Brand {
+  id                 String               @id @default(cuid())
+  code               String               @unique
+  name               String
+  orgId              String?              // future RBAC — tenant isolation key
+  dataRuns           DataRun[]
+  insights           Insight[]
+  actions            Action[]
+  kpiTiles           KpiTile[]
+  goldInputSnapshots GoldInputSnapshot[]
+  claimsMetrics      ClaimsMetricsFact[]
+  spMetrics          SpMetricsFact[]
+  callsMetrics       CallsMetricsFact[]
+  structureChanges   StructureChangeLog[]
+}
+
+model DataRun {
+  id                 String               @id @default(cuid())
+  brandId            String
+  brand              Brand                @relation(fields: [brandId], references: [id])
+  runAt              DateTime
+  timeWindow         String
+  geography          String
+  status             String               @default("complete")
+  datasets           Dataset[]
+  kpiTiles           KpiTile[]
+  insights           Insight[]
+  goldInputSnapshots GoldInputSnapshot[]
+}
+
+model Dataset {
+  id          String   @id @default(cuid())
+  dataRunId   String
+  dataRun     DataRun  @relation(fields: [dataRunId], references: [id])
+  name        String
+  displayName String
+  lastRun     DateTime
+  freshness   String
+  coverage    Float
+  notes       String
+}
+
+model KpiTile {
+  id        String  @id @default(cuid())
+  brandId   String
+  brand     Brand   @relation(fields: [brandId], references: [id])
+  dataRunId String
+  dataRun   DataRun @relation(fields: [dataRunId], references: [id])
+  title     String
+  value     String
+  delta     String
+  deltaType String
+  sparkline Int[]
+  sortOrder Int     @default(0)
+}
+
+model Insight {
+  id            String         @id @default(cuid())
+  brandId       String
+  brand         Brand          @relation(fields: [brandId], references: [id])
+  dataRunId     String
+  dataRun       DataRun        @relation(fields: [dataRunId], references: [id])
+  headline      String
+  pillar        String
+  severity      String
+  confidence    String
+  impact        String
+  region        String
+  status        String         @default("New")
+  notes         String?        // user-editable notes (saved via PATCH)
+  generatedDate DateTime       @default(now())
+  createdBy     String?        // future RBAC — user/system that generated this insight
+  drivers       Driver[]
+  metricChanges MetricChange[]
+  contributors  Contributor[]
+  risks         InsightRisk[]
+  actions       Action[]
+}
+
+model Driver {
+  id          String  @id @default(cuid())
+  insightId   String
+  insight     Insight @relation(fields: [insightId], references: [id])
+  label       String
+  confidence  Int
+  description String
+  sortOrder   Int     @default(0)
+}
+
+model MetricChange {
+  id            String  @id @default(cuid())
+  insightId     String
+  insight       Insight @relation(fields: [insightId], references: [id])
+  metric        String
+  before        String
+  after         String
+  change        String
+  changePercent String
+  direction     String
+}
+
+model Contributor {
+  id        String  @id @default(cuid())
+  insightId String
+  insight   Insight @relation(fields: [insightId], references: [id])
+  entity    String
+  type      String
+  impact    String
+  percent   String
+  sortOrder Int     @default(0)
+}
+
+model InsightRisk {
+  id        String  @id @default(cuid())
+  insightId String
+  insight   Insight @relation(fields: [insightId], references: [id])
+  risk      String
+  sortOrder Int     @default(0)
+}
+
+model Action {
+  id            String       @id @default(cuid())
+  brandId       String
+  brand         Brand        @relation(fields: [brandId], references: [id])
+  insightId     String?
+  insight       Insight?     @relation(fields: [insightId], references: [id])
+  title         String
+  linkedInsight String
+  owner         String
+  ownerRole     String?      // e.g. "Regional Sales Director"
+  dueDate       DateTime
+  severity      String
+  expectedLag   String
+  status        String       @default("new")
+  notes         String?      // additional context or instructions
+  createdAt     DateTime     @default(now())
+  createdBy     String?      // future RBAC — user who created this action
+  impactScore   ImpactScore?
+}
+
+model ImpactScore {
+  id                 String   @id @default(cuid())
+  actionId           String   @unique
+  action             Action   @relation(fields: [actionId], references: [id])
+  // Manual entry fields (used by UI — keep for backward compat)
+  metric             String
+  before             String
+  after              String
+  change             String
+  outcome            String
+  completedDate      DateTime
+  // Auto-evaluation fields (written by evaluateActions)
+  baselineDataRunId  String?
+  evaluatedDataRunId String?
+  metricKey          String?
+  baselineValue      Float?
+  currentValue       Float?
+  autoEvaluated      Boolean  @default(false)
+}
+
+model GoldInputSnapshot {
+  id            String   @id @default(cuid())
+  brandId       String
+  brand         Brand    @relation(fields: [brandId], references: [id])
+  dataRunId     String
+  dataRun       DataRun  @relation(fields: [dataRunId], references: [id])
+  snapshotDate  DateTime
+  metric        String
+  dimension     String
+  dimensionType String
+  currentValue  Float
+  priorValue    Float
+  unit          String
+}
+
+model ClaimsMetricsFact {
+  id                String   @id @default(cuid())
+  brandId           String
+  brand             Brand    @relation(fields: [brandId], references: [id])
+  weekEnding        DateTime
+  dimension         String
+  dimensionType     String
+  nrxCount          Int
+  marketSharePct    Float?
+  activePrescribers Int?
+}
+
+model SpMetricsFact {
+  id                   String   @id @default(cuid())
+  brandId              String
+  brand                Brand    @relation(fields: [brandId], references: [id])
+  recordDate           DateTime
+  pendingOutreachCount Int
+  resolutionTimeMedian Float
+  tttMedianDays        Float
+}
+
+model CallsMetricsFact {
+  id                 String   @id @default(cuid())
+  brandId            String
+  brand              Brand    @relation(fields: [brandId], references: [id])
+  weekEnding         DateTime
+  territory          String
+  compliancePct      Float
+  repsTotal          Int
+  repsBelowThreshold Int
+}
+
+model StructureChangeLog {
+  id           String   @id @default(cuid())
+  brandId      String
+  brand        Brand    @relation(fields: [brandId], references: [id])
+  eventDate    DateTime
+  eventType    String
+  payerName    String
+  region       String
+  coveredLives Int
+}

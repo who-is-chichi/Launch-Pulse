@@ -1,0 +1,56 @@
+# =========================
+# Launch Pulse (Next.js + TS + Prisma + Vitest)
+# Based on your zip: has .next/, node_modules/, .env*, Prisma
+# =========================
+
+# --- Dependencies ---
+**/node_modules/
+**/.pnp/
+**/.pnp.js
+
+# --- Next.js build output ---
+**/.next/
+**/out/
+**/.vercel/
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+**/*.log
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+**/.idea/
+**/.vscode/
+**/*.swp
+**/*.swo
+
+# --- TypeScript ---
+**/*.tsbuildinfo
+next-env.d.ts
+
+# --- Testing (Vitest) ---
+**/coverage/
+**/.nyc_output/
+**/.vitest/
+
+# --- Lint / cache ---
+**/.eslintcache
+**/.cache/
+
+# --- Prisma / DB artifacts (keep schema + migrations committed) ---
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+
+# --- Local tooling (present in your zip) ---
+.claude/settings.local.json
