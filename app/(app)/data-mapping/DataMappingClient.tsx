@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Upload, Play, CheckCircle2, AlertTriangle, Clock, Info } from 'lucide-react';
+import { Upload, Play, CheckCircle2, AlertTriangle, Clock, Info, Plus, History, ArrowUpDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import UploadMappingWizard from './UploadMappingWizard';
 
 interface Dataset {
   id: string;
@@ -23,22 +24,44 @@ interface Dataset {
   notes: string;
 }
 
-const mappingConfigs = [
-  { dataset: 'Claims', status: 'Configured', lastUpdated: '2025-12-15' },
-  { dataset: 'Dispense', status: 'Configured', lastUpdated: '2025-12-15' },
-  { dataset: 'SP Cases', status: 'Needs review', lastUpdated: '2025-11-20' },
-  { dataset: 'Calls', status: 'Configured', lastUpdated: '2026-01-10' },
-];
+interface MappingConfig {
+  id: string;
+  dataset: string;
+  status: string;
+  lastUpdated: string;
+}
 
-const spStatusMapping = [
-  { hubValue: 'Pending Benefit Investigation', normalizedValue: 'Pending BI', category: 'Investigation' },
-  { hubValue: 'Pending PA', normalizedValue: 'Pending PA', category: 'Access' },
-  { hubValue: 'Pending Patient Outreach', normalizedValue: 'Pending Outreach', category: 'Engagement' },
-  { hubValue: 'Approved - Pending Shipment', normalizedValue: 'Approved', category: 'Fulfillment' },
-  { hubValue: 'Shipped', normalizedValue: 'Shipped', category: 'Fulfillment' },
-  { hubValue: 'Completed', normalizedValue: 'Completed', category: 'Closed' },
-  { hubValue: 'Abandoned', normalizedValue: 'Abandoned', category: 'Closed' },
-];
+interface NormalizationRule {
+  id: string;
+  hubValue: string;
+  normalizedValue: string;
+  category: string;
+}
+
+interface PublishedMapping {
+  id: string;
+  name: string;
+  dataset: string;
+  publishedBy: string;
+  publishedAt: string;
+  fieldCount: number;
+  status: string;
+}
+
+interface DataRun {
+  timeWindow: string;
+  geography: string;
+  runAt: string;
+}
+
+interface Props {
+  datasets: Dataset[];
+  mappingConfigs: MappingConfig[];
+  normalizationRules: NormalizationRule[];
+  publishedMappings: PublishedMapping[];
+  dataRun: DataRun | null;
+  brandCode: string;
+}
 
 function FreshnessIcon({ freshness }: { freshness: string }) {
   if (freshness === 'Fresh') return <CheckCircle2 className="w-4 h-4 text-[#16A34A]" />;
@@ -59,14 +82,50 @@ function FreshnessBadge({ freshness }: { freshness: string }) {
   );
 }
 
-export default function DataMappingClient({ datasets }: { datasets: Dataset[] }) {
+export default function DataMappingClient({
+  datasets,
+  mappingConfigs,
+  normalizationRules,
+  publishedMappings,
+  dataRun,
+  brandCode,
+}: Props) {
   const [activeTab, setActiveTab] = useState('status');
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<MappingConfig | null>(null);
+  const [editStatus, setEditStatus] = useState('');
+  const [configs, setConfigs] = useState<MappingConfig[]>(mappingConfigs);
 
   const formatLastRun = (date: Date | string) =>
     new Date(date).toLocaleString('en-US', {
       year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
+      hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
     });
+
+  const openEdit = (config: MappingConfig) => {
+    setEditingConfig(config);
+    setEditStatus(config.status);
+  };
+
+  const saveEdit = async () => {
+    if (!editingConfig) return;
+    const res = await fetch('/api/data-mapping/configs', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editingConfig.id, status: editStatus, brandCode }),
+    });
+    if (res.ok) {
+      const { config } = await res.json();
+      setConfigs((prev) =>
+        prev.map((c) =>
+          c.id === config.id
+            ? { ...c, status: config.status, lastUpdated: config.lastUpdated }
+            : c
+        )
+      );
+    }
+    setEditingConfig(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -78,10 +137,20 @@ export default function DataMappingClient({ datasets }: { datasets: Dataset[] })
       >
         <div>
           <h1 className="text-2xl font-semibold text-[#0F172A] mb-1">Data & Mapping</h1>
-          <p className="text-sm text-[#64748B]">Monitor data pipelines and manage configuration</p>
+          {dataRun ? (
+            <p className="text-xs text-[#94A3B8] mt-0.5">
+              {dataRun.timeWindow} · {dataRun.geography} · {new Date(dataRun.runAt).toLocaleDateString()}
+            </p>
+          ) : (
+            <p className="text-sm text-[#64748B]">Monitor data pipelines and manage configuration</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => { setActiveTab('mappings'); setWizardOpen(true); }}
+          >
             <Upload className="w-4 h-4" />
             Upload Mapping
           </Button>
@@ -140,7 +209,11 @@ export default function DataMappingClient({ datasets }: { datasets: Dataset[] })
                               style={{ width: `${dataset.coverage}%` }}
                             />
                           </div>
-                          <span className="text-sm font-semibold text-[#334155] min-w-[3rem]" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          <span
+                            className="text-sm font-semibold text-[#334155] min-w-[3rem]"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                            title="% of expected records received and validated"
+                          >
                             {dataset.coverage}%
                           </span>
                         </div>
@@ -167,6 +240,8 @@ export default function DataMappingClient({ datasets }: { datasets: Dataset[] })
                   <span className="font-semibold">Fresh:</span> Within expected refresh window.
                   <span className="font-semibold ml-3">Lag:</span> Delayed but usable.
                   <span className="font-semibold ml-3">Stale:</span> Needs attention.
+                  <span className="font-semibold ml-3">Coverage:</span>{' '}
+                  % of expected records received and validated in this drop.
                 </p>
               </div>
             </div>
@@ -174,41 +249,111 @@ export default function DataMappingClient({ datasets }: { datasets: Dataset[] })
         </TabsContent>
 
         <TabsContent value="mappings" className="mt-6">
-          <div className="bg-white rounded-2xl border border-[#E2E8F0]" style={{ boxShadow: 'var(--card-shadow)' }}>
-            <div className="p-6">
-              <h3 className="font-semibold text-[#0F172A] mb-4">Dataset Mapping Status</h3>
-              <div className="space-y-3">
-                {mappingConfigs.map((config) => (
-                  <div key={config.dataset} className="flex items-center justify-between p-4 border border-[#F1F5F9] rounded-xl hover:bg-[#FAFBFC] transition-colors">
-                    <div>
-                      <div className="text-sm font-medium text-[#0F172A]">{config.dataset}</div>
-                      <div className="text-[11px] text-[#94A3B8]">Last updated: {config.lastUpdated}</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge className={`rounded-full border font-semibold text-[11px] ${
-                        config.status === 'Configured'
-                          ? 'bg-[#F0FDF4] text-[#166534] border-[#BBF7D0]'
-                          : 'bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]'
-                      }`}>
-                        {config.status}
-                      </Badge>
-                      <Button variant="outline" size="sm" className="rounded-xl">Edit</Button>
-                    </div>
-                  </div>
-                ))}
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl border border-[#E2E8F0]" style={{ boxShadow: 'var(--card-shadow)' }}>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-[#0F172A]">Dataset Mapping Status</h3>
+                  <Button
+                    size="sm"
+                    onClick={() => setWizardOpen(true)}
+                    className="gap-1.5 rounded-xl text-white"
+                    style={{
+                      background: 'linear-gradient(135deg, #1D4ED8, #2563EB)',
+                      boxShadow: '0 2px 8px rgba(29,78,216,0.3)',
+                    }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Upload New Mapping
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {configs.map((config) => (
+                    <motion.div
+                      key={config.id}
+                      whileHover={{ y: -1 }}
+                      className="flex items-center justify-between p-4 border border-[#F1F5F9] rounded-xl hover:bg-[#FAFBFC] hover:border-[#E2E8F0] transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                          config.status === 'Configured' ? 'bg-[#F0FDF4]' : 'bg-[#FFFBEB]'
+                        }`}>
+                          {config.status === 'Configured' ? (
+                            <CheckCircle2 className="w-4 h-4 text-[#16A34A]" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-[#D97706]" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-[#0F172A]">{config.dataset}</div>
+                          <div className="text-[11px] text-[#94A3B8]">
+                            Last updated: {new Date(config.lastUpdated).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge className={`rounded-full border font-semibold text-[11px] ${
+                          config.status === 'Configured'
+                            ? 'bg-[#F0FDF4] text-[#166534] border-[#BBF7D0]'
+                            : 'bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]'
+                        }`}>
+                          {config.status}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl"
+                          onClick={(e) => { e.stopPropagation(); openEdit(config); }}
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="border-t border-[#E2E8F0] p-6">
-              <h3 className="font-semibold text-[#0F172A] mb-3">Upload New Mapping</h3>
-              <div className="border-2 border-dashed border-[#E2E8F0] rounded-xl p-8 text-center hover:border-[#93C5FD] hover:bg-[#F8FAFC] transition-colors">
-                <Upload className="w-8 h-8 text-[#CBD5E1] mx-auto mb-3" />
-                <p className="text-sm text-[#64748B] mb-1">Drop your mapping configuration file here or click to browse</p>
-                <p className="text-[11px] text-[#94A3B8]">Supports JSON and YAML formats</p>
-                <Button variant="outline" size="sm" className="mt-4 rounded-xl">Select File</Button>
+            <div className="bg-white rounded-2xl border border-[#E2E8F0]" style={{ boxShadow: 'var(--card-shadow)' }}>
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <History className="w-4 h-4 text-[#64748B]" />
+                  <h3 className="font-semibold text-[#0F172A]">Recently Published Mappings</h3>
+                </div>
+                <div className="space-y-3">
+                  {publishedMappings.map((mapping) => (
+                    <div key={mapping.id} className="flex items-center justify-between p-3 border border-[#F1F5F9] rounded-xl hover:bg-[#FAFBFC] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#F1F5F9] flex items-center justify-center">
+                          <ArrowUpDown className="w-3.5 h-3.5 text-[#64748B]" />
+                        </div>
+                        <div>
+                          <div className="text-[13px] font-medium text-[#0F172A]">{mapping.name}</div>
+                          <div className="text-[11px] text-[#94A3B8]">
+                            {mapping.dataset} · {mapping.fieldCount} fields · Published by {mapping.publishedBy}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-[#94A3B8]">
+                          {new Date(mapping.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        <Badge className={`rounded-full border text-[10px] font-semibold ${
+                          mapping.status === 'Active'
+                            ? 'bg-[#F0FDF4] text-[#166534] border-[#BBF7D0]'
+                            : 'bg-[#F8FAFC] text-[#94A3B8] border-[#E2E8F0]'
+                        }`}>
+                          {mapping.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
+
+          <UploadMappingWizard brand={brandCode} open={wizardOpen} onClose={() => setWizardOpen(false)} />
         </TabsContent>
 
         <TabsContent value="normalization" className="mt-6">
@@ -229,14 +374,14 @@ export default function DataMappingClient({ datasets }: { datasets: Dataset[] })
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F1F5F9]">
-                    {spStatusMapping.map((mapping, index) => (
-                      <tr key={index} className="hover:bg-[#F8FAFC] transition-colors">
-                        <td className="px-4 py-3 text-sm text-[#334155]">{mapping.hubValue}</td>
+                    {normalizationRules.map((rule) => (
+                      <tr key={rule.id} className="hover:bg-[#F8FAFC] transition-colors">
+                        <td className="px-4 py-3 text-sm text-[#334155]">{rule.hubValue}</td>
                         <td className="px-4 py-3">
-                          <Badge variant="outline" className="rounded-full text-[11px]">{mapping.normalizedValue}</Badge>
+                          <Badge variant="outline" className="rounded-full text-[11px]">{rule.normalizedValue}</Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant="secondary" className="rounded-full text-[11px]">{mapping.category}</Badge>
+                          <Badge variant="secondary" className="rounded-full text-[11px]">{rule.category}</Badge>
                         </td>
                         <td className="px-4 py-3">
                           <Button variant="ghost" size="sm">Edit</Button>
@@ -287,6 +432,32 @@ export default function DataMappingClient({ datasets }: { datasets: Dataset[] })
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Status Modal */}
+      {editingConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 w-80 shadow-xl">
+            <h3 className="font-semibold text-[#0F172A] mb-4">Edit Mapping Status</h3>
+            <p className="text-sm text-[#64748B] mb-3">{editingConfig.dataset}</p>
+            <select
+              value={editStatus}
+              onChange={(e) => setEditStatus(e.target.value)}
+              className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] mb-4 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
+            >
+              <option value="Configured">Configured</option>
+              <option value="Needs review">Needs review</option>
+            </select>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setEditingConfig(null)}>
+                Cancel
+              </Button>
+              <Button size="sm" className="rounded-xl" onClick={saveEdit}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

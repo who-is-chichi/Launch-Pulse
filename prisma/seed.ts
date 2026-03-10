@@ -41,6 +41,9 @@ async function main() {
   await prisma.callsMetricsFact.deleteMany({ where: { brandId: brand.id } });
   await prisma.structureChangeLog.deleteMany({ where: { brandId: brand.id } });
   await prisma.territoryChangeLog.deleteMany({ where: { brandId: brand.id } });
+  await prisma.mappingConfig.deleteMany({ where: { brandId: brand.id } });
+  await prisma.normalizationRule.deleteMany({ where: { brandId: brand.id } });
+  await prisma.publishedMapping.deleteMany({ where: { brandId: brand.id } });
 
   // ─── 4 DataRuns spaced across 3 weeks ───────────────────────────────────────
 
@@ -346,6 +349,38 @@ async function main() {
     ],
   });
 
+  // ─── Mapping configs, normalization rules, published mappings ────────────────
+
+  await prisma.mappingConfig.createMany({
+    data: [
+      { brandId: brand.id, dataset: 'Claims',   status: 'Configured',   lastUpdated: new Date('2025-12-15') },
+      { brandId: brand.id, dataset: 'Dispense',  status: 'Configured',   lastUpdated: new Date('2025-12-15') },
+      { brandId: brand.id, dataset: 'SP Cases',  status: 'Needs review', lastUpdated: new Date('2025-11-20') },
+      { brandId: brand.id, dataset: 'Calls',     status: 'Configured',   lastUpdated: new Date('2026-01-10') },
+    ],
+  });
+
+  await prisma.normalizationRule.createMany({
+    data: [
+      { brandId: brand.id, hubValue: 'Pending Benefit Investigation', normalizedValue: 'Pending BI',       category: 'Investigation', sortOrder: 0 },
+      { brandId: brand.id, hubValue: 'Pending PA',                    normalizedValue: 'Pending PA',       category: 'Access',        sortOrder: 1 },
+      { brandId: brand.id, hubValue: 'Pending Patient Outreach',      normalizedValue: 'Pending Outreach', category: 'Engagement',    sortOrder: 2 },
+      { brandId: brand.id, hubValue: 'Approved - Pending Shipment',   normalizedValue: 'Approved',         category: 'Fulfillment',   sortOrder: 3 },
+      { brandId: brand.id, hubValue: 'Shipped',                       normalizedValue: 'Shipped',          category: 'Fulfillment',   sortOrder: 4 },
+      { brandId: brand.id, hubValue: 'Completed',                     normalizedValue: 'Completed',        category: 'Closed',        sortOrder: 5 },
+      { brandId: brand.id, hubValue: 'Abandoned',                     normalizedValue: 'Abandoned',        category: 'Closed',        sortOrder: 6 },
+    ],
+  });
+
+  await prisma.publishedMapping.createMany({
+    data: [
+      { brandId: brand.id, name: 'Claims Weekly v2.0',   dataset: 'Claims',   publishedBy: 'Sarah Chen',  publishedAt: new Date('2026-03-05'), fieldCount: 24, status: 'Active' },
+      { brandId: brand.id, name: 'Dispense Weekly v1.3', dataset: 'Dispense', publishedBy: 'Mike Torres', publishedAt: new Date('2026-02-28'), fieldCount: 18, status: 'Active' },
+      { brandId: brand.id, name: 'Calls Activity v1.1',  dataset: 'Calls',    publishedBy: 'Sarah Chen',  publishedAt: new Date('2026-01-10'), fieldCount: 15, status: 'Active' },
+      { brandId: brand.id, name: 'Claims Weekly v1.9',   dataset: 'Claims',   publishedBy: 'Sarah Chen',  publishedAt: new Date('2025-12-15'), fieldCount: 24, status: 'Superseded' },
+    ],
+  });
+
   // ─── Engine run on all DataRuns (generates insights for each) ────────────────
 
   // Run engine on historical runs so total insights across all runs ≥ 12
@@ -405,6 +440,9 @@ async function main() {
   console.log(`  SpFact:        4 rows`);
   console.log(`  CallsFact:     12 rows (4 weeks × 3 territories)`);
   console.log(`  TerritoryLog:  3 rows (1 vacancy, 1 realignment, 1 new_hire)`);
+  console.log(`  MappingConfig: 4 rows`);
+  console.log(`  NormRules:     7 rows`);
+  console.log(`  PubMappings:   4 rows (3 active, 1 superseded)`);
 }
 
 main()

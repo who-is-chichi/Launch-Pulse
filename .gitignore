@@ -8,6 +8,8 @@
 **/.pnp/
 **/.pnp.js
 
+**/UI_Mapping/
+
 # --- Next.js build output ---
 **/.next/
 **/out/

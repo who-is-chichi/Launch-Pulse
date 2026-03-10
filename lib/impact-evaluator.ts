@@ -47,11 +47,17 @@ interface MetricResolution {
 }
 
 const METRIC_KEY_MAP: Record<string, MetricResolution> = {
-  'NRx Count': { key: 'nrx_count', dimension: 'Nation', dimensionType: 'nation', displayName: 'NRx Count' },
-  'National NRx WoW': { key: 'nrx_count', dimension: 'Nation', dimensionType: 'nation', displayName: 'NRx Count' },
-  'Time-to-Therapy': { key: 'ttt_median_days', dimension: 'Nation', dimensionType: 'nation', displayName: 'Time to Therapy (days)' },
+  // Legacy / display labels
+  'NRx Count':          { key: 'nrx_count',             dimension: 'Nation', dimensionType: 'nation', displayName: 'NRx Count' },
+  'National NRx WoW':   { key: 'nrx_count',             dimension: 'Nation', dimensionType: 'nation', displayName: 'NRx Count' },
+  'Time-to-Therapy':    { key: 'ttt_median_days',        dimension: 'Nation', dimensionType: 'nation', displayName: 'Time to Therapy (days)' },
   'SP Resolution Time': { key: 'resolution_time_median', dimension: 'Nation', dimensionType: 'nation', displayName: 'SP Resolution Time (days)' },
-  'Call Compliance': { key: 'call_compliance_pct', dimension: 'Nation', dimensionType: 'nation', displayName: 'Call Compliance (%)' },
+  'Call Compliance':    { key: 'call_compliance_pct',    dimension: 'Nation', dimensionType: 'nation', displayName: 'Call Compliance (%)' },
+  // Engine-generated MetricChange labels (actual strings written by templates)
+  'NRx Volume':                             { key: 'nrx_count',            dimension: 'Nation', dimensionType: 'nation', displayName: 'NRx Count' },
+  'Median Days Approval to First Dispense': { key: 'ttt_median_days',      dimension: 'Nation', dimensionType: 'nation', displayName: 'Time to Therapy (days)' },
+  'SP Pending Backlog (Cases)':             { key: 'pending_outreach_count', dimension: 'Nation', dimensionType: 'nation', displayName: 'SP Pending Outreach (cases)' },
+  'Median SP Resolution Time':              { key: 'resolution_time_median', dimension: 'Nation', dimensionType: 'nation', displayName: 'SP Resolution Time (days)' },
 };
 
 const DEFAULT_RESOLUTION: MetricResolution = {
@@ -110,6 +116,16 @@ export async function evaluateActions(
         continue;
       }
 
+      // Skip if a manual ImpactScore already exists (autoEvaluated=false means user entered it)
+      const existingScore = await prisma.impactScore.findUnique({
+        where: { actionId: action.id },
+        select: { autoEvaluated: true },
+      });
+      if (existingScore && existingScore.autoEvaluated === false) {
+        skipped++;
+        continue;
+      }
+
       // Find baseline DataRun: most recent completed run at or before action.createdAt
       const baselineRun = await prisma.dataRun.findFirst({
         where: {
@@ -128,7 +144,13 @@ export async function evaluateActions(
 
       // Resolve metric from insight's first MetricChange
       const firstMetric = action.insight?.metricChanges?.[0]?.metric ?? '';
-      const resolved = METRIC_KEY_MAP[firstMetric] ?? DEFAULT_RESOLUTION;
+      let resolved: MetricResolution = METRIC_KEY_MAP[firstMetric];
+      if (!resolved && firstMetric.startsWith('Call Compliance')) {
+        // Territory-specific label e.g. "Call Compliance — T12"
+        const territory = firstMetric.split('—')[1]?.trim() ?? 'Nation';
+        resolved = { key: 'call_compliance_pct', dimension: territory, dimensionType: 'territory', displayName: 'Call Compliance (%)' };
+      }
+      if (!resolved) resolved = DEFAULT_RESOLUTION;
 
       // Look up GoldInputSnapshot for baseline and new run
       const [baselineSnap, currentSnap] = await Promise.all([

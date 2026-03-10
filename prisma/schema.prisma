@@ -22,6 +22,9 @@ model Brand {
   callsMetrics       CallsMetricsFact[]
   structureChanges   StructureChangeLog[]
   territoryChanges   TerritoryChangeLog[]
+  mappingConfigs     MappingConfig[]
+  normalizationRules NormalizationRule[]
+  publishedMappings  PublishedMapping[]
 }
 
 model DataRun {
@@ -236,4 +239,41 @@ model TerritoryChangeLog {
   changeType   String   // 'realignment' | 'vacancy' | 'new_hire'
   affectedReps Int
   region       String
+}
+
+model MappingConfig {
+  id          String   @id @default(cuid())
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id])
+  dataset     String
+  status      String   @default("Configured")
+  lastUpdated DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NormalizationRule {
+  id              String   @id @default(cuid())
+  brandId         String
+  brand           Brand    @relation(fields: [brandId], references: [id])
+  ruleType        String   @default("sp_status")
+  hubValue        String
+  normalizedValue String
+  category        String
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PublishedMapping {
+  id          String   @id @default(cuid())
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id])
+  name        String
+  dataset     String
+  publishedBy String
+  publishedAt DateTime @default(now())
+  fieldCount  Int      @default(0)
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
 }

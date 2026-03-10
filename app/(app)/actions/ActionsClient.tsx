@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Plus, User, Calendar, Target, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -177,7 +177,8 @@ const defaultImpactForm = (): ImpactForm => ({
 export default function ActionsClient({ actions: initialActions }: { actions: Action[] }) {
   const [activeTab, setActiveTab] = useState('board');
   const [actions, setActions] = useState(initialActions);
-  const { searchQuery } = useFilters();
+  const { searchQuery, brand } = useFilters();
+  const inFlight = useRef<Set<string>>(new Set());
 
   // Impact score modal state
   const [impactModal, setImpactModal] = useState<{ id: string } | null>(null);
@@ -186,7 +187,7 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
 
   // Create action manually modal state
   const [showManualModal, setShowManualModal] = useState(false);
-  const [manualForm, setManualForm] = useState({ title: '', linkedInsight: '', owner: '', ownerRole: '', dueDate: '', severity: 'High', expectedLag: '', notes: '' });
+  const [manualForm, setManualForm] = useState({ title: '', linkedInsight: '', owner: '', ownerRole: '', dueDate: '', severity: 'Medium', expectedLag: '', notes: '' });
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
 
@@ -198,7 +199,7 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
       const res = await fetch('/api/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandCode: 'ONC-101', ...manualForm }),
+        body: JSON.stringify({ brandCode: brand, ...manualForm }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -208,7 +209,7 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
       const { action } = await res.json();
       setActions((prev) => [action, ...prev]);
       setShowManualModal(false);
-      setManualForm({ title: '', linkedInsight: '', owner: '', ownerRole: '', dueDate: '', severity: 'High', expectedLag: '', notes: '' });
+      setManualForm({ title: '', linkedInsight: '', owner: '', ownerRole: '', dueDate: '', severity: 'Medium', expectedLag: '', notes: '' });
     } catch {
       setManualError('Failed to create action');
     } finally {
@@ -217,6 +218,8 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
   };
 
   const commitStatusChange = async (id: string, newStatus: string, impactScore?: ImpactForm) => {
+    if (inFlight.current.has(id)) return;
+    inFlight.current.add(id);
     const prev = actions;
     setActions((a) => a.map((x) => (x.id === id ? { ...x, status: newStatus } : x)));
     try {
@@ -228,6 +231,8 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
       if (!res.ok) setActions(prev);
     } catch {
       setActions(prev);
+    } finally {
+      inFlight.current.delete(id);
     }
   };
 
