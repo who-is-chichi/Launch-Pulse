@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { sortBySeverityDesc } from '@/lib/severity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,10 +35,12 @@ export async function GET(request: NextRequest) {
       where.headline = { contains: search, mode: 'insensitive' };
     }
 
-    const insights = await prisma.insight.findMany({
+    const insightsRaw = await prisma.insight.findMany({
       where,
-      orderBy: [{ severity: 'asc' }, { generatedDate: 'desc' }],
+      orderBy: { generatedDate: 'desc' },
     });
+
+    const insights = sortBySeverityDesc(insightsRaw);
 
     return NextResponse.json({ insights });
   } catch (err) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { INSIGHT_STATUSES } from '@/lib/severity';
 
 export async function GET(
   _request: NextRequest,
@@ -25,7 +26,7 @@ export async function GET(
   return NextResponse.json({ insight });
 }
 
-const VALID_STATUSES = ['New', 'Investigating', 'Actioned', 'Monitoring'];
+const VALID_STATUSES: readonly string[] = INSIGHT_STATUSES;
 
 export async function PATCH(
   request: NextRequest,
@@ -33,10 +34,20 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { status, notes } = await request.json();
+    const { status, notes, brandCode } = await request.json();
 
     if (status !== undefined && !VALID_STATUSES.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+
+    if (brandCode) {
+      const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
+      const existing = brand
+        ? await prisma.insight.findUnique({ where: { id }, select: { brandId: true } })
+        : null;
+      if (!brand || !existing || existing.brandId !== brand.id) {
+        return NextResponse.json({ error: 'Insight not found' }, { status: 404 });
+      }
     }
 
     const updateData: Record<string, string> = {};

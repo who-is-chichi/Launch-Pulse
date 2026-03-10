@@ -11,6 +11,8 @@ import ActionItem from '@/components/ActionItem';
 import DecisionRiskPanel from '@/components/DecisionRiskPanel';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useFilters } from '@/components/FilterContext';
+import { INSIGHT_STATUSES } from '@/lib/severity';
 
 interface Driver { label: string; confidence: number; description: string; }
 interface MetricChange { metric: string; before: string; after: string; change: string; changePercent: string; direction: string; }
@@ -38,7 +40,12 @@ interface InsightDetailProps {
   };
 }
 
-const dataSources = ['Claims', 'Dispense', 'SP Cases', 'Call Data', 'Structure'];
+const PILLAR_SOURCES: Record<string, string[]> = {
+  Demand: ['Claims'],
+  'Start Ops': ['SP Cases'],
+  Execution: ['Call Data', 'Claims'],
+  Structure: ['Territory Data'],
+};
 
 function AIInsightNarrative({ insight }: InsightDetailProps) {
   const [narrative, setNarrative] = useState<string | null>(null);
@@ -125,7 +132,6 @@ function AIInsightNarrative({ insight }: InsightDetailProps) {
   );
 }
 
-const VALID_STATUSES = ['New', 'Investigating', 'Actioned', 'Monitoring'] as const;
 
 const statusColors: Record<string, string> = {
   New: 'bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE]',
@@ -134,7 +140,8 @@ const statusColors: Record<string, string> = {
   Monitoring: 'bg-[#F5F3FF] text-[#5B21B6] border-[#DDD6FE]',
 };
 
-export default function InsightDetailClient({ insight }: InsightDetailProps) {
+export default function InsightDetailClient({ insight, brandCode }: InsightDetailProps & { brandCode: string }) {
+  const { brand } = useFilters();
   const [currentStatus, setCurrentStatus] = useState(insight.status);
   const [notesValue, setNotesValue] = useState(insight.notes ?? '');
   const [notesSaved, setNotesSaved] = useState(false);
@@ -159,7 +166,7 @@ export default function InsightDetailClient({ insight }: InsightDetailProps) {
       const res = await fetch(`/api/insights/${insight.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, brandCode }),
       });
       if (!res.ok) {
         setCurrentStatus(previousStatus);
@@ -179,7 +186,7 @@ export default function InsightDetailClient({ insight }: InsightDetailProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...actionForm,
-          brandCode: 'ONC-101',
+          brandCode: brand,
           insightId: insight.id,
           linkedInsight: insight.headline,
         }),
@@ -243,7 +250,7 @@ export default function InsightDetailClient({ insight }: InsightDetailProps) {
           onChange={e => handleStatusChange(e.target.value)}
           className={`rounded-full border text-[11px] font-semibold px-2.5 py-0.5 cursor-pointer appearance-none focus:outline-none ${statusColors[currentStatus] ?? ''}`}
         >
-          {VALID_STATUSES.map(s => (
+          {INSIGHT_STATUSES.map(s => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
@@ -385,7 +392,7 @@ export default function InsightDetailClient({ insight }: InsightDetailProps) {
         </div>
         <div className="flex items-center gap-2 mt-4">
           <span className="text-[11px] text-[#94A3B8] font-medium uppercase tracking-wider">Data sources:</span>
-          {dataSources.map((source) => (
+          {[...new Set([...(PILLAR_SOURCES[insight.pillar] ?? []), ...insight.metricChanges.map(m => m.metric)])].map((source) => (
             <Badge key={source} variant="outline" className="rounded-full text-[11px]">
               {source}
             </Badge>
@@ -440,7 +447,7 @@ export default function InsightDetailClient({ insight }: InsightDetailProps) {
                   await fetch(`/api/insights/${insight.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes: notesValue }),
+                    body: JSON.stringify({ notes: notesValue, brandCode }),
                   });
                   setNotesSaved(true);
                   setTimeout(() => setNotesSaved(false), 2000);
@@ -451,7 +458,7 @@ export default function InsightDetailClient({ insight }: InsightDetailProps) {
                   await fetch(`/api/insights/${insight.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes: notesValue }),
+                    body: JSON.stringify({ notes: notesValue, brandCode }),
                   });
                   setNotesSaved(true);
                   setTimeout(() => setNotesSaved(false), 2000);

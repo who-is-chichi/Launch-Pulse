@@ -40,6 +40,7 @@ async function main() {
   await prisma.spMetricsFact.deleteMany({ where: { brandId: brand.id } });
   await prisma.callsMetricsFact.deleteMany({ where: { brandId: brand.id } });
   await prisma.structureChangeLog.deleteMany({ where: { brandId: brand.id } });
+  await prisma.territoryChangeLog.deleteMany({ where: { brandId: brand.id } });
 
   // ─── 4 DataRuns spaced across 3 weeks ───────────────────────────────────────
 
@@ -86,43 +87,43 @@ async function main() {
 
   // ─── KPI Tiles per run (trending progressively) ──────────────────────────────
 
-  // Run 1 (week 1) — baseline
+  // Run 1 (week 1) — baseline. Demand value = NRx count; delta = WoW %
   await prisma.kpiTile.createMany({
     data: [
-      { brandId: brand.id, dataRunId: run1.id, title: 'Demand Momentum', value: '-2.0%', delta: '-2.0%', deltaType: 'down', sparkline: [98, 97, 95, 94, 92, 90, 88], sortOrder: 0 },
+      { brandId: brand.id, dataRunId: run1.id, title: 'Demand Momentum', value: '438', delta: '-2.0%', deltaType: 'down', sparkline: [98, 97, 95, 94, 92, 90, 88], sortOrder: 0 },
       { brandId: brand.id, dataRunId: run1.id, title: 'Time-to-Therapy', value: '9.4d', delta: '+0.4d', deltaType: 'down', sparkline: [30, 35, 40, 45, 50, 55, 60], sortOrder: 1 },
       { brandId: brand.id, dataRunId: run1.id, title: 'Execution Coverage', value: '83%', delta: '-1%', deltaType: 'down', sparkline: [90, 88, 87, 86, 85, 84, 83], sortOrder: 2 },
-      { brandId: brand.id, dataRunId: run1.id, title: 'Structure Integrity', value: '97%', delta: '+0%', deltaType: 'up', sparkline: [95, 95, 96, 96, 97, 97, 97], sortOrder: 3 },
+      { brandId: brand.id, dataRunId: run1.id, title: 'Structure Integrity', value: '100%', delta: '+0%', deltaType: 'up', sparkline: [95, 95, 96, 96, 97, 97, 100], sortOrder: 3 },
     ],
   });
 
   // Run 2 (week 2)
   await prisma.kpiTile.createMany({
     data: [
-      { brandId: brand.id, dataRunId: run2.id, title: 'Demand Momentum', value: '-5.5%', delta: '-3.5%', deltaType: 'down', sparkline: [88, 86, 82, 78, 74, 70, 65], sortOrder: 0 },
+      { brandId: brand.id, dataRunId: run2.id, title: 'Demand Momentum', value: '420', delta: '-5.5%', deltaType: 'down', sparkline: [88, 86, 82, 78, 74, 70, 65], sortOrder: 0 },
       { brandId: brand.id, dataRunId: run2.id, title: 'Time-to-Therapy', value: '10.8d', delta: '+1.4d', deltaType: 'down', sparkline: [60, 62, 65, 68, 72, 76, 80], sortOrder: 1 },
       { brandId: brand.id, dataRunId: run2.id, title: 'Execution Coverage', value: '79%', delta: '-4%', deltaType: 'down', sparkline: [83, 82, 81, 80, 79, 78, 79], sortOrder: 2 },
-      { brandId: brand.id, dataRunId: run2.id, title: 'Structure Integrity', value: '98%', delta: '+1%', deltaType: 'up', sparkline: [97, 97, 97, 98, 98, 98, 98], sortOrder: 3 },
+      { brandId: brand.id, dataRunId: run2.id, title: 'Structure Integrity', value: '100%', delta: '+0%', deltaType: 'up', sparkline: [97, 97, 97, 98, 98, 98, 100], sortOrder: 3 },
     ],
   });
 
   // Run 3 (week 3)
   await prisma.kpiTile.createMany({
     data: [
-      { brandId: brand.id, dataRunId: run3.id, title: 'Demand Momentum', value: '-9.0%', delta: '-3.5%', deltaType: 'down', sparkline: [65, 60, 55, 50, 45, 40, 35], sortOrder: 0 },
+      { brandId: brand.id, dataRunId: run3.id, title: 'Demand Momentum', value: '392', delta: '-9.0%', deltaType: 'down', sparkline: [65, 60, 55, 50, 45, 40, 35], sortOrder: 0 },
       { brandId: brand.id, dataRunId: run3.id, title: 'Time-to-Therapy', value: '11.8d', delta: '+1.0d', deltaType: 'down', sparkline: [80, 82, 84, 86, 88, 90, 92], sortOrder: 1 },
       { brandId: brand.id, dataRunId: run3.id, title: 'Execution Coverage', value: '75%', delta: '-4%', deltaType: 'down', sparkline: [79, 78, 77, 76, 75, 74, 75], sortOrder: 2 },
-      { brandId: brand.id, dataRunId: run3.id, title: 'Structure Integrity', value: '99%', delta: '+1%', deltaType: 'up', sparkline: [98, 98, 99, 99, 99, 99, 99], sortOrder: 3 },
+      { brandId: brand.id, dataRunId: run3.id, title: 'Structure Integrity', value: '91%', delta: '-2%', deltaType: 'down', sparkline: [98, 98, 96, 95, 94, 93, 91], sortOrder: 3 },
     ],
   });
 
   // Latest run (run4) — current state
   await prisma.kpiTile.createMany({
     data: [
-      { brandId: brand.id, dataRunId: dataRun.id, title: 'Demand Momentum', value: '-12.0%', delta: '-3.0%', deltaType: 'down', sparkline: [100, 90, 80, 70, 60, 50, 20], sortOrder: 0 },
+      { brandId: brand.id, dataRunId: dataRun.id, title: 'Demand Momentum', value: '345', delta: '-12.0%', deltaType: 'down', sparkline: [100, 90, 80, 70, 60, 50, 20], sortOrder: 0 },
       { brandId: brand.id, dataRunId: dataRun.id, title: 'Time-to-Therapy', value: '12.4d', delta: '+0.6d', deltaType: 'down', sparkline: [20, 33, 47, 60, 73, 87, 100], sortOrder: 1 },
       { brandId: brand.id, dataRunId: dataRun.id, title: 'Execution Coverage', value: '73%', delta: '-2%', deltaType: 'down', sparkline: [100, 88, 76, 64, 52, 36, 20], sortOrder: 2 },
-      { brandId: brand.id, dataRunId: dataRun.id, title: 'Structure Integrity', value: '100%', delta: '+1%', deltaType: 'up', sparkline: [20, 33, 47, 60, 73, 87, 100], sortOrder: 3 },
+      { brandId: brand.id, dataRunId: dataRun.id, title: 'Structure Integrity', value: '89%', delta: '-2%', deltaType: 'down', sparkline: [91, 91, 90, 90, 89, 89, 89], sortOrder: 3 },
     ],
   });
 
@@ -217,9 +218,9 @@ async function main() {
   await prisma.action.create({
     data: {
       brandId: brand.id,
-      title: 'Communicate formulary win to Southwest field team',
-      linkedInsight: 'Formulary win Southwest', owner: 'Marketing Ops',
-      dueDate: new Date('2026-03-11'), severity: 'Low', expectedLag: '1 week', status: 'inprogress',
+      title: 'Backfill T12 territory vacancy with interim rep coverage',
+      linkedInsight: 'Territory vacancy detected in Northeast', owner: 'Sales Ops',
+      dueDate: new Date('2026-03-11'), severity: 'High', expectedLag: '1-2 weeks', status: 'inprogress',
     },
   });
 
@@ -337,11 +338,11 @@ async function main() {
     ],
   });
 
-  await prisma.structureChangeLog.createMany({
+  await prisma.territoryChangeLog.createMany({
     data: [
-      { brandId: brand.id, eventDate: new Date('2026-02-28T00:00:00Z'), eventType: 'formulary_win', payerName: 'Southwest Regional Health Plan', region: 'Southwest', coveredLives: 6000 },
-      { brandId: brand.id, eventDate: new Date('2026-02-28T00:00:00Z'), eventType: 'formulary_win', payerName: 'Desert States Payer Network', region: 'Southwest', coveredLives: 6000 },
-      { brandId: brand.id, eventDate: new Date('2026-02-10T00:00:00Z'), eventType: 'formulary_submission', payerName: 'BlueCross Southwest', region: 'Southwest', coveredLives: 18000 },
+      { brandId: brand.id, changeDate: new Date('2026-02-28T00:00:00Z'), territory: 'T12', changeType: 'vacancy', affectedReps: 2, region: 'Northeast' },
+      { brandId: brand.id, changeDate: new Date('2026-02-28T00:00:00Z'), territory: 'T15', changeType: 'realignment', affectedReps: 3, region: 'Midwest' },
+      { brandId: brand.id, changeDate: new Date('2026-03-01T00:00:00Z'), territory: 'T08', changeType: 'new_hire', affectedReps: 1, region: 'Southwest' },
     ],
   });
 
@@ -403,7 +404,7 @@ async function main() {
   console.log(`  ClaimsFact:    27 rows (4 weeks × 7 dimensions for current/prior, 4 for weeks 3–4 regions + 6 parent_org)`);
   console.log(`  SpFact:        4 rows`);
   console.log(`  CallsFact:     12 rows (4 weeks × 3 territories)`);
-  console.log(`  StructureLog:  3 rows`);
+  console.log(`  TerritoryLog:  3 rows (1 vacancy, 1 realignment, 1 new_hire)`);
 }
 
 main()

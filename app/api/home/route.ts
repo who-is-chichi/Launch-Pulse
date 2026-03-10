@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sortBySeverityDesc } from '@/lib/severity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,15 +23,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No data run found' }, { status: 404 });
     }
 
-    const [kpiTiles, insights, actions] = await Promise.all([
+    const [kpiTiles, insightsRaw, actions] = await Promise.all([
       prisma.kpiTile.findMany({
         where: { brandId: brand.id, dataRunId: dataRun.id },
         orderBy: { sortOrder: 'asc' },
       }),
       prisma.insight.findMany({
         where: { brandId: brand.id, dataRunId: dataRun.id },
-        orderBy: [{ severity: 'asc' }, { generatedDate: 'desc' }],
-        take: 5,
       }),
       prisma.action.findMany({
         where: { brandId: brand.id, status: { not: 'done' } },
@@ -38,6 +37,8 @@ export async function GET(request: NextRequest) {
         take: 3,
       }),
     ]);
+
+    const insights = sortBySeverityDesc(insightsRaw).slice(0, 5);
 
     return NextResponse.json({ kpiTiles, insights, actions, dataRun });
   } catch (err) {

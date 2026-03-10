@@ -13,7 +13,8 @@ RULES:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { insights = [], kpiTiles = [], drivers = [] } = body;
+    const { insights = [], kpiTiles = [], drivers = [], dataRunId } = body;
+    void dataRunId; // informational — scopes which run the brief was generated for
 
     const inputData = { insights, kpiTiles, drivers };
 

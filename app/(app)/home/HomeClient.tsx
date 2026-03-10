@@ -55,6 +55,7 @@ interface InsightRisk {
 
 interface HomeClientProps {
   brandCode: string;
+  dataRunId: string;
   kpiTiles: KpiTile[];
   insights: Insight[];
   actions: Action[];
@@ -74,15 +75,17 @@ const PILLAR_COLORS: Record<string, string> = {
 function computeDriverData(drivers: Driver[]) {
   const pillarMap: Record<string, number> = { Demand: 0, 'Start Ops': 0, Execution: 0, Structure: 0 };
   for (const d of drivers) {
-    if (d.label.includes('Execution') || d.label.includes('Coverage') || d.label.includes('Rep')) {
+    const lbl = d.label.toLowerCase();
+    if (lbl.includes('execution') || lbl.includes('coverage') || lbl.includes('rep') || lbl.includes('call') || lbl.includes('account')) {
       pillarMap['Execution'] += d.confidence;
-    } else if (d.label.includes('Start Ops') || d.label.includes('SP') || d.label.includes('TTT') || d.label.includes('Hub') || d.label.includes('Dispense') || d.label.includes('Auth')) {
+    } else if (lbl.includes('start ops') || lbl.includes('sp ') || lbl.includes('ttt') || lbl.includes('hub') || lbl.includes('dispense') || lbl.includes('auth') || lbl.includes('outreach') || lbl.includes('backlog') || lbl.includes('resolution')) {
       pillarMap['Start Ops'] += d.confidence;
-    } else if (d.label.includes('HCP') || d.label.includes('Prescrib') || d.label.includes('Payer') || d.label.includes('Formulary') || d.label.includes('Commercial')) {
+    } else if (lbl.includes('hcp') || lbl.includes('prescrib') || lbl.includes('adoption') || lbl.includes('demand')) {
       pillarMap['Demand'] += d.confidence;
-    } else {
+    } else if (lbl.includes('territory') || lbl.includes('alignment') || lbl.includes('vacancy') || lbl.includes('realignment') || lbl.includes('churn') || lbl.includes('structure')) {
       pillarMap['Structure'] += d.confidence;
     }
+    // Labels not matching any pillar are excluded (not bucketed into a wrong pillar)
   }
   const total = Object.values(pillarMap).reduce((a, b) => a + b, 0) || 1;
   return Object.entries(pillarMap)
@@ -100,19 +103,19 @@ function freshnessColor(freshness: string) {
   return '#DC2626';
 }
 
-export default function HomeClient({ brandCode, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt }: HomeClientProps) {
+export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt }: HomeClientProps) {
   const { geography, searchQuery } = useFilters();
   const [pulseBrief, setPulseBrief] = useState<string | null>(null);
   const [isBriefLoading, setIsBriefLoading] = useState(false);
   const [briefCooldownSecs, setBriefCooldownSecs] = useState(0);
-  const lastBriefAt = useRef<number>(0);
+  const lastBriefAt = useRef<Map<string, number>>(new Map());
   const COOLDOWN_MS = 30_000;
   const driverData = computeDriverData(drivers);
 
   useEffect(() => {
     if (briefCooldownSecs <= 0) return;
     const timer = setInterval(() => {
-      const remaining = Math.ceil((COOLDOWN_MS - (Date.now() - lastBriefAt.current)) / 1000);
+      const remaining = Math.ceil((COOLDOWN_MS - (Date.now() - (lastBriefAt.current.get(dataRunId) ?? 0))) / 1000);
       if (remaining <= 0) {
         setBriefCooldownSecs(0);
         clearInterval(timer);
@@ -139,12 +142,12 @@ export default function HomeClient({ brandCode, kpiTiles, insights, actions, dat
     new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const handlePulseBrief = async () => {
-    const elapsed = Date.now() - lastBriefAt.current;
+    const elapsed = Date.now() - (lastBriefAt.current.get(dataRunId) ?? 0);
     if (elapsed < COOLDOWN_MS) {
       setBriefCooldownSecs(Math.ceil((COOLDOWN_MS - elapsed) / 1000));
       return;
     }
-    lastBriefAt.current = Date.now();
+    lastBriefAt.current.set(dataRunId, Date.now());
     setBriefCooldownSecs(COOLDOWN_MS / 1000);
     setIsBriefLoading(true);
     setPulseBrief(null);
@@ -152,7 +155,7 @@ export default function HomeClient({ brandCode, kpiTiles, insights, actions, dat
       const res = await fetch('/api/ai/pulse-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ insights, kpiTiles, drivers }),
+        body: JSON.stringify({ insights, kpiTiles, drivers, dataRunId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -192,7 +195,7 @@ export default function HomeClient({ brandCode, kpiTiles, insights, actions, dat
             className="gap-2"
             onClick={() => {
               const a = document.createElement('a');
-              a.href = `/api/export/exec-pack?brand=${encodeURIComponent(brandCode)}`;
+              a.href = `/api/export/exec-pack?brand=${encodeURIComponent(brandCode)}&runId=${encodeURIComponent(dataRunId)}`;
               a.download = `exec-pack-${brandCode}.html`;
               a.click();
             }}

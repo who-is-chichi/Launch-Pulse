@@ -1,4 +1,4 @@
-import type { ClaimsMetricsFact, SpMetricsFact, CallsMetricsFact, StructureChangeLog, Dataset } from '@prisma/client';
+import type { ClaimsMetricsFact, SpMetricsFact, CallsMetricsFact, StructureChangeLog, TerritoryChangeLog, Dataset } from '@prisma/client';
 
 export interface EngineInput {
   brandId: string;
@@ -7,6 +7,7 @@ export interface EngineInput {
   spFacts: SpMetricsFact[];
   callsFacts: CallsMetricsFact[];
   structureEvents: StructureChangeLog[];
+  territoryChanges: TerritoryChangeLog[];
   datasets: Dataset[];
   currentWeekEnding: Date;
   priorWeekEnding: Date;

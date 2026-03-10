@@ -14,6 +14,7 @@ export default async function InsightDetailPage({
   const insight = await prisma.insight.findUnique({
     where: { id },
     include: {
+      brand: true,
       drivers: { orderBy: { sortOrder: 'asc' } },
       metricChanges: true,
       contributors: { orderBy: { sortOrder: 'asc' } },
@@ -26,5 +27,5 @@ export default async function InsightDetailPage({
     notFound();
   }
 
-  return <InsightDetailClient insight={insight} />;
+  return <InsightDetailClient insight={insight} brandCode={insight.brand.code} />;
 }

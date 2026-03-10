@@ -21,6 +21,7 @@ model Brand {
   spMetrics          SpMetricsFact[]
   callsMetrics       CallsMetricsFact[]
   structureChanges   StructureChangeLog[]
+  territoryChanges   TerritoryChangeLog[]
 }
 
 model DataRun {
@@ -224,4 +225,15 @@ model StructureChangeLog {
   payerName    String
   region       String
   coveredLives Int
+}
+
+model TerritoryChangeLog {
+  id           String   @id @default(cuid())
+  brandId      String
+  brand        Brand    @relation(fields: [brandId], references: [id])
+  changeDate   DateTime
+  territory    String
+  changeType   String   // 'realignment' | 'vacancy' | 'new_hire'
+  affectedReps Int
+  region       String
 }

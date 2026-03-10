@@ -58,16 +58,19 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const brandCode = searchParams.get('brand') ?? 'ONC-101';
+    const runId = searchParams.get('runId');
 
     const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
     if (!brand) {
       return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
     }
 
-    const dataRun = await prisma.dataRun.findFirst({
-      where: { brandId: brand.id, status: 'complete' },
-      orderBy: { runAt: 'desc' },
-    });
+    const dataRun = runId
+      ? await prisma.dataRun.findFirst({ where: { id: runId, brandId: brand.id } })
+      : await prisma.dataRun.findFirst({
+          where: { brandId: brand.id, status: 'complete' },
+          orderBy: { runAt: 'desc' },
+        });
 
     const [kpiTiles, insights, openActions, completedActions, datasets] = await Promise.all([
       dataRun

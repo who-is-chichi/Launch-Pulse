@@ -223,8 +223,8 @@ export default function InsightsClient({
 
       <div className="flex items-center justify-between text-sm text-[#94A3B8]">
         <span>
-          Showing {filteredInsights.length} of {totalCount} insights
-          {totalPages > 1 && ` (page ${page} of ${totalPages})`}
+          Showing {filteredInsights.length} of {initialInsights.length} on this page
+          {totalPages > 1 && ` (page ${page} of ${totalPages}, ${totalCount} total)`}
         </span>
         <div className="flex items-center gap-2">
           <Button

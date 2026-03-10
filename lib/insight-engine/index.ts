@@ -7,7 +7,7 @@ import { run as demandTopSystemsSwing } from './templates/demand-top-systems-swi
 import { run as startopsSPBottleneck } from './templates/startops-sp-bottleneck';
 import { run as startopsTTTShift } from './templates/startops-ttt-shift';
 import { run as executionCoverageShift } from './templates/execution-coverage-shift';
-import { run as structureFormularyChange } from './templates/structure-formulary-change';
+import { run as structureTerritoryChurn } from './templates/structure-territory-churn';
 
 function computeKpiTiles(input: EngineInput): KpiTileOutput[] {
   const tiles: KpiTileOutput[] = [];
@@ -15,14 +15,14 @@ function computeKpiTiles(input: EngineInput): KpiTileOutput[] {
   const currClaims = filterByWeek(input.claimsFacts, input.currentWeekEnding);
   const priorClaims = filterByWeek(input.claimsFacts, input.priorWeekEnding);
 
-  // Demand Momentum — nation-level NRx WoW %
+  // Demand Momentum — nation-level NRx count as value, WoW % as delta
   const nrxCurr = currClaims.find(r => r.dimensionType === 'nation');
   const nrxPrior = priorClaims.find(r => r.dimensionType === 'nation');
   if (nrxCurr && nrxPrior && nrxPrior.nrxCount > 0) {
     const pct = ((nrxCurr.nrxCount - nrxPrior.nrxCount) / nrxPrior.nrxCount) * 100;
     tiles.push({
       title: 'Demand Momentum',
-      value: formatPct(pct),
+      value: nrxCurr.nrxCount.toLocaleString(),
       delta: formatPct(pct),
       deltaType: pct >= 0 ? 'up' : 'down',
       sparkline: makeSparkline(nrxPrior.nrxCount, nrxCurr.nrxCount),
@@ -64,17 +64,19 @@ function computeKpiTiles(input: EngineInput): KpiTileOutput[] {
     });
   }
 
-  // Structure Integrity — 100 - (losses × 2), wins add +1 each
-  const losses = input.structureEvents.filter(e => e.eventType === 'formulary_loss');
-  const wins = input.structureEvents.filter(e => e.eventType === 'formulary_win');
-  const integrityScore = Math.min(100, Math.max(0, 100 - losses.length * 2 + wins.length));
-  const priorScore = integrityScore - (wins.length > 0 ? 2 : 0);
-  const integrityDelta = wins.length > 0 ? `+${wins.length}` : losses.length > 0 ? `-${losses.length}` : '+0';
+  // Structure Integrity — territory vacancy/realignment based (not formulary)
+  const vacancies    = input.territoryChanges.filter(e => e.changeType === 'vacancy');
+  const realignments = input.territoryChanges.filter(e => e.changeType === 'realignment');
+  const newHires     = input.territoryChanges.filter(e => e.changeType === 'new_hire');
+  const integrityScore = Math.min(100, Math.max(0, 100 - vacancies.length * 5 - realignments.length * 2 + newHires.length));
+  const priorScore     = Math.min(100, Math.max(0, integrityScore + vacancies.length * 5 + realignments.length * 2 - newHires.length));
+  const netChange      = newHires.length - vacancies.length - realignments.length;
+  const integrityDelta = netChange >= 0 ? `+${netChange}` : `${netChange}`;
   tiles.push({
     title: 'Structure Integrity',
     value: `${integrityScore}%`,
     delta: `${integrityDelta}%`,
-    deltaType: losses.length > 0 ? 'down' : 'up',
+    deltaType: vacancies.length > 0 || realignments.length > newHires.length ? 'down' : 'up',
     sparkline: makeSparkline(priorScore, integrityScore),
     sortOrder: 3,
   });
@@ -106,12 +108,12 @@ export async function runInsightEngine(
   const currentWeekEnding = toUtcMidnight(latestClaimsRow ? latestClaimsRow.weekEnding : dataRun.runAt);
   const priorWeekEnding = toUtcMidnight(subDays(currentWeekEnding, 7));
 
-  const [claimsFacts, spFacts, callsFacts, structureEvents] = await Promise.all([
+  const [claimsFacts, spFacts, callsFacts, territoryChanges] = await Promise.all([
     prisma.claimsMetricsFact.findMany({ where: { brandId: dataRun.brandId } }),
     prisma.spMetricsFact.findMany({ where: { brandId: dataRun.brandId } }),
     prisma.callsMetricsFact.findMany({ where: { brandId: dataRun.brandId } }),
-    prisma.structureChangeLog.findMany({
-      where: { brandId: dataRun.brandId, eventDate: { gte: priorWeekEnding } },
+    prisma.territoryChangeLog.findMany({
+      where: { brandId: dataRun.brandId, changeDate: { gte: priorWeekEnding } },
     }),
   ]);
 
@@ -136,7 +138,8 @@ export async function runInsightEngine(
     claimsFacts,
     spFacts,
     callsFacts,
-    structureEvents,
+    structureEvents: [],
+    territoryChanges,
     datasets: dataRun.datasets,
     currentWeekEnding,
     priorWeekEnding,
@@ -148,7 +151,7 @@ export async function runInsightEngine(
     startopsSPBottleneck,
     startopsTTTShift,
     executionCoverageShift,
-    structureFormularyChange,
+    structureTerritoryChurn,
   ];
 
   const outputs = templates
