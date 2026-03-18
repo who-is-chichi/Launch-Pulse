@@ -4,10 +4,12 @@ import { logger } from '@/lib/logger';
 import { INSIGHT_STATUSES } from '@/lib/severity';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const brandCode = searchParams.get('brand');
 
   const insight = await prisma.insight.findUnique({
     where: { id },
@@ -21,6 +23,14 @@ export async function GET(
 
   if (!insight) {
     return NextResponse.json({ error: 'Insight not found' }, { status: 404 });
+  }
+
+  if (brandCode) {
+    const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
+    if (!brand || insight.brandId !== brand.id) {
+      logger.error('Insight brand mismatch', { route: '[insights/[id] GET]', id, brandCode });
+      return NextResponse.json({ error: 'Insight not found' }, { status: 404 });
+    }
   }
 
   return NextResponse.json({ insight });

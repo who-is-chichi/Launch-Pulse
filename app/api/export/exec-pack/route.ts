@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 const SEVERITY_COLOR: Record<string, string> = {
   High: '#991B1B',
@@ -37,6 +38,15 @@ const OUTCOME_LABEL: Record<string, string> = {
   Partial: 'Partial Impact',
   No: 'No Measurable Impact',
 };
+
+function escHtml(str: unknown): string {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
 
 function formatDate(date: Date | string) {
   return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -105,7 +115,7 @@ export async function GET(request: NextRequest) {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Exec Pack — ${brand.name} — ${runDate}</title>
+<title>Exec Pack — ${escHtml(brand.name)} — ${runDate}</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8FAFC; color: #0F172A; font-size: 14px; line-height: 1.5; }
@@ -162,7 +172,7 @@ export async function GET(request: NextRequest) {
   <!-- Header -->
   <div class="header">
     <div>
-      <div class="brand-name">${brand.name}</div>
+      <div class="brand-name">${escHtml(brand.name)}</div>
       <div class="brand-sub">Executive Intelligence Pack · ${runDate}</div>
     </div>
     <span class="confidential">Confidential</span>
@@ -175,9 +185,9 @@ export async function GET(request: NextRequest) {
     <div class="kpi-grid">
       ${kpiTiles.map((k) => `
       <div class="kpi-card">
-        <div class="kpi-label">${k.title}</div>
-        <div class="kpi-value">${k.value}</div>
-        <div class="kpi-delta" style="color:${deltaColor(k.deltaType)}">${deltaArrow(k.deltaType)} ${k.delta}</div>
+        <div class="kpi-label">${escHtml(k.title)}</div>
+        <div class="kpi-value">${escHtml(k.value)}</div>
+        <div class="kpi-delta" style="color:${deltaColor(k.deltaType)}">${deltaArrow(k.deltaType)} ${escHtml(k.delta)}</div>
       </div>`).join('')}
     </div>
   </div>` : ''}
@@ -189,17 +199,17 @@ export async function GET(request: NextRequest) {
     ${insights.map((ins) => `
     <div class="insight-row">
       <div style="flex:1">
-        <div class="insight-headline">${ins.headline}</div>
+        <div class="insight-headline">${escHtml(ins.headline)}</div>
         <div class="meta-chips">
           <span class="badge" style="background:${SEVERITY_BG[ins.severity] ?? '#F8FAFC'};color:${SEVERITY_COLOR[ins.severity] ?? '#334155'};border-color:transparent">
             <span class="dot" style="background:${SEVERITY_COLOR[ins.severity] ?? '#94A3B8'}"></span>
-            ${ins.severity}
+            ${escHtml(ins.severity)}
           </span>
-          <span class="chip">${ins.region}</span>
-          <span class="impact-label">Impact: <strong>${ins.impact}</strong></span>
+          <span class="chip">${escHtml(ins.region)}</span>
+          <span class="impact-label">Impact: <strong>${escHtml(ins.impact)}</strong></span>
         </div>
       </div>
-      <span class="badge" style="background:${PILLAR_COLOR[ins.pillar] ?? '#64748B'}22;color:${PILLAR_COLOR[ins.pillar] ?? '#64748B'};border-color:${PILLAR_COLOR[ins.pillar] ?? '#64748B'}44">${ins.pillar}</span>
+      <span class="badge" style="background:${PILLAR_COLOR[ins.pillar] ?? '#64748B'}22;color:${PILLAR_COLOR[ins.pillar] ?? '#64748B'};border-color:${PILLAR_COLOR[ins.pillar] ?? '#64748B'}44">${escHtml(ins.pillar)}</span>
     </div>`).join('')}
   </div>` : ''}
 
@@ -220,11 +230,11 @@ export async function GET(request: NextRequest) {
       <tbody>
         ${openActions.map((a) => `
         <tr>
-          <td style="font-weight:500;color:#0F172A">${a.title}</td>
-          <td>${a.owner}</td>
+          <td style="font-weight:500;color:#0F172A">${escHtml(a.title)}</td>
+          <td>${escHtml(a.owner)}</td>
           <td>${formatDate(a.dueDate)}</td>
-          <td><span class="badge" style="background:${SEVERITY_BG[a.severity] ?? '#F8FAFC'};color:${SEVERITY_COLOR[a.severity] ?? '#334155'};border-color:transparent;font-size:10px">${a.severity}</span></td>
-          <td style="color:#D97706;font-weight:600">${a.expectedLag ?? '—'}</td>
+          <td><span class="badge" style="background:${SEVERITY_BG[a.severity] ?? '#F8FAFC'};color:${SEVERITY_COLOR[a.severity] ?? '#334155'};border-color:transparent;font-size:10px">${escHtml(a.severity)}</span></td>
+          <td style="color:#D97706;font-weight:600">${escHtml(a.expectedLag ?? '—')}</td>
         </tr>`).join('')}
       </tbody>
     </table>
@@ -239,23 +249,23 @@ export async function GET(request: NextRequest) {
       return `
     <div class="scorecard">
       <div class="scorecard-header">
-        <div class="scorecard-title">${a.title}</div>
+        <div class="scorecard-title">${escHtml(a.title)}</div>
         <span class="badge" style="background:${OUTCOME_BG[s.outcome] ?? '#F8FAFC'};color:${OUTCOME_COLOR[s.outcome] ?? '#334155'};border-color:transparent">
-          ${OUTCOME_LABEL[s.outcome] ?? s.outcome}
+          ${escHtml(OUTCOME_LABEL[s.outcome] ?? s.outcome)}
         </span>
       </div>
       <div class="scorecard-grid">
         <div class="scorecard-cell">
-          <div class="scorecard-cell-label">${s.metric} — Before</div>
-          <div class="scorecard-cell-value">${s.before}</div>
+          <div class="scorecard-cell-label">${escHtml(s.metric)} — Before</div>
+          <div class="scorecard-cell-value">${escHtml(s.before)}</div>
         </div>
         <div class="scorecard-cell">
           <div class="scorecard-cell-label">After</div>
-          <div class="scorecard-cell-value">${s.after}</div>
+          <div class="scorecard-cell-value">${escHtml(s.after)}</div>
         </div>
         <div class="scorecard-cell change-cell">
           <div class="scorecard-cell-label">Change</div>
-          <div class="scorecard-cell-value change-value">${s.change}</div>
+          <div class="scorecard-cell-value change-value">${escHtml(s.change)}</div>
         </div>
       </div>
     </div>`;
@@ -268,7 +278,7 @@ export async function GET(request: NextRequest) {
       <div class="footer-label">Data Sources</div>
       <div class="freshness-chips">
         ${datasets.length > 0
-          ? datasets.map((d) => `<span class="freshness-chip">${d.displayName ?? d.name} · ${d.freshness}</span>`).join('')
+          ? datasets.map((d) => `<span class="freshness-chip">${escHtml(d.displayName ?? d.name)} · ${escHtml(d.freshness)}</span>`).join('')
           : '<span class="freshness-chip">No dataset metadata available</span>'
         }
       </div>
@@ -291,7 +301,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
-    console.error({ route: '[export/exec-pack]', error: err instanceof Error ? err.message : err, ts: new Date().toISOString() });
+    logger.error('exec-pack export failed', { route: '[export/exec-pack]', error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ error: 'Failed to generate exec pack' }, { status: 500 });
   }
 }

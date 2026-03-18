@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { anthropic } from '@/lib/anthropic';
+import { logger } from '@/lib/logger';
 
 const SYSTEM_PROMPT = `You are a pharmaceutical launch analytics AI. Given structured insight data for a single insight, write 2-3 sentences of plain-English narrative explaining what happened, why it matters commercially, and what's at stake if left unaddressed. Be grounded strictly in the provided data — do not invent numbers, percentages, or facts not present in the input. Write in a direct, professional tone suited for commercial leadership.
 
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ narrative });
   } catch (err) {
-    console.error('[ai/insight-narrative]', err);
+    logger.error('ai/insight-narrative failed', { route: 'ai/insight-narrative', error: err instanceof Error ? err.message : String(err) });
     const message = err instanceof Error ? err.message : 'Narrative generation failed';
     const isBilling = message.includes('credit balance') || message.includes('billing');
     return NextResponse.json(

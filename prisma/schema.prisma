@@ -39,6 +39,8 @@ model DataRun {
   kpiTiles           KpiTile[]
   insights           Insight[]
   goldInputSnapshots GoldInputSnapshot[]
+
+  @@index([brandId, runAt])
 }
 
 model Dataset {
@@ -88,6 +90,9 @@ model Insight {
   contributors  Contributor[]
   risks         InsightRisk[]
   actions       Action[]
+
+  @@index([dataRunId, severity])
+  @@index([brandId, dataRunId])
 }
 
 model Driver {
@@ -98,6 +103,8 @@ model Driver {
   confidence  Int
   description String
   sortOrder   Int     @default(0)
+
+  @@index([insightId])
 }
 
 model MetricChange {
@@ -110,6 +117,8 @@ model MetricChange {
   change        String
   changePercent String
   direction     String
+
+  @@index([insightId])
 }
 
 model Contributor {
@@ -121,6 +130,8 @@ model Contributor {
   impact    String
   percent   String
   sortOrder Int     @default(0)
+
+  @@index([insightId])
 }
 
 model InsightRisk {
@@ -129,6 +140,8 @@ model InsightRisk {
   insight   Insight @relation(fields: [insightId], references: [id])
   risk      String
   sortOrder Int     @default(0)
+
+  @@index([insightId])
 }
 
 model Action {
@@ -184,6 +197,9 @@ model GoldInputSnapshot {
   currentValue  Float
   priorValue    Float
   unit          String
+
+  @@index([brandId, dataRunId])
+  @@index([brandId, metric, dimension])
 }
 
 model ClaimsMetricsFact {
@@ -196,6 +212,9 @@ model ClaimsMetricsFact {
   nrxCount          Int
   marketSharePct    Float?
   activePrescribers Int?
+
+  @@index([brandId, weekEnding])
+  @@index([brandId, dimensionType])
 }
 
 model SpMetricsFact {
@@ -206,6 +225,8 @@ model SpMetricsFact {
   pendingOutreachCount Int
   resolutionTimeMedian Float
   tttMedianDays        Float
+
+  @@index([brandId, recordDate])
 }
 
 model CallsMetricsFact {
@@ -217,6 +238,8 @@ model CallsMetricsFact {
   compliancePct      Float
   repsTotal          Int
   repsBelowThreshold Int
+
+  @@index([brandId, weekEnding])
 }
 
 model StructureChangeLog {
@@ -239,6 +262,8 @@ model TerritoryChangeLog {
   changeType   String   // 'realignment' | 'vacancy' | 'new_hire'
   affectedReps Int
   region       String
+
+  @@index([brandId, changeDate])
 }
 
 model MappingConfig {

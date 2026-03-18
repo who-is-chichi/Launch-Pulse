@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { logger } from '@/lib/logger';
+import { validateActionBody } from '@/lib/actions-validation';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -23,18 +24,13 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ actions });
 }
 
-const VALID_SEVERITIES = ['High', 'Medium', 'Low'];
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { brandCode = 'ONC-101', title, linkedInsight, owner, ownerRole, dueDate, severity, expectedLag, insightId, notes } = body;
+    const validationError = validateActionBody(body);
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
-    if (!title || typeof title !== 'string') return NextResponse.json({ error: 'title is required' }, { status: 400 });
-    if (!linkedInsight || typeof linkedInsight !== 'string') return NextResponse.json({ error: 'linkedInsight is required' }, { status: 400 });
-    if (!owner || typeof owner !== 'string') return NextResponse.json({ error: 'owner is required' }, { status: 400 });
-    if (!dueDate) return NextResponse.json({ error: 'dueDate is required' }, { status: 400 });
-    if (!severity || !VALID_SEVERITIES.includes(severity)) return NextResponse.json({ error: 'severity must be High, Medium, or Low' }, { status: 400 });
+    const { brandCode = 'ONC-101', title, linkedInsight, owner, ownerRole, dueDate, severity, expectedLag, insightId, notes } = body;
 
     const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
     if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 });

@@ -9,11 +9,22 @@ export async function POST(
 ) {
   try {
     const { id: dataRunId } = await params;
+    const body = await _request.json().catch(() => ({}));
+    const { brandCode } = body as { brandCode?: string };
 
     const dataRun = await prisma.dataRun.findUnique({ where: { id: dataRunId } });
     if (!dataRun) {
       return NextResponse.json({ error: 'DataRun not found' }, { status: 404 });
     }
+
+    if (brandCode) {
+      const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
+      if (!brand || dataRun.brandId !== brand.id) {
+        logger.error('DataRun brand mismatch', { route: '[runs/[id]/generate-insights POST]', id: dataRunId, brandCode });
+        return NextResponse.json({ error: 'DataRun not found' }, { status: 404 });
+      }
+    }
+
     if (dataRun.status !== 'complete') {
       return NextResponse.json({ error: 'DataRun is not complete' }, { status: 400 });
     }

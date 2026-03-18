@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, Download, UserPlus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,7 @@ export default function InsightsClient({
   pageSize: number;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedPillar, setSelectedPillar] = useState('all');
   const [selectedSeverity, setSelectedSeverity] = useState('all');
   const { geography, searchQuery } = useFilters();
@@ -231,7 +232,11 @@ export default function InsightsClient({
             variant="outline"
             size="sm"
             disabled={page <= 1}
-            onClick={() => router.push(`/insights?page=${page - 1}`)}
+            onClick={() => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.set('page', String(page - 1));
+              router.push(`/insights?${params.toString()}`);
+            }}
             className="rounded-xl"
           >
             Previous
@@ -240,7 +245,11 @@ export default function InsightsClient({
             variant="outline"
             size="sm"
             disabled={page >= totalPages}
-            onClick={() => router.push(`/insights?page=${page + 1}`)}
+            onClick={() => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.set('page', String(page + 1));
+              router.push(`/insights?${params.toString()}`);
+            }}
             className="rounded-xl"
           >
             Next

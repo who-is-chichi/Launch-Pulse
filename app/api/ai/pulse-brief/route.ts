@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { anthropic } from '@/lib/anthropic';
+import { logger } from '@/lib/logger';
 
 const SYSTEM_PROMPT = `You are a pharmaceutical launch analytics AI writing a concise executive pulse brief for commercial leadership.
 
@@ -37,13 +38,13 @@ export async function POST(request: NextRequest) {
     const briefNumbers = brief.match(/\d+\.?\d*/g) ?? [];
     for (const num of briefNumbers) {
       if (!inputStr.includes(num)) {
-        console.warn(`[ai/pulse-brief] Possible hallucinated number: ${num}`);
+        logger.warn('Possible hallucinated number', { route: 'ai/pulse-brief', number: num });
       }
     }
 
     return NextResponse.json({ brief });
   } catch (err) {
-    console.error('[ai/pulse-brief]', err);
+    logger.error('ai/pulse-brief failed', { route: 'ai/pulse-brief', error: err instanceof Error ? err.message : String(err) });
     const message = err instanceof Error ? err.message : 'Pulse brief generation failed';
     const isBilling = message.includes('credit balance') || message.includes('billing');
     return NextResponse.json(
