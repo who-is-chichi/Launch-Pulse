@@ -31,10 +31,18 @@ export async function middleware(request: NextRequest) {
   // Verify the user still exists and their tokenVersion matches — this invalidates tokens
   // for deleted users or after forced logout (tokenVersion increment).
   // Trade-off: 1 extra DB query per authenticated request; acceptable for a small team.
-  const dbUser = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    select: { tokenVersion: true },
-  });
+  // Fail-closed: if the DB is unreachable, deny access rather than allow a potentially invalid session.
+  let dbUser: { tokenVersion: number } | null = null;
+  try {
+    dbUser = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { tokenVersion: true },
+    });
+  } catch {
+    const response = NextResponse.redirect(new URL('/login', request.url));
+    response.cookies.delete(COOKIE_NAME);
+    return response;
+  }
   if (!dbUser || dbUser.tokenVersion !== payload.tokenVersion) {
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete(COOKIE_NAME);
