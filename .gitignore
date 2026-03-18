@@ -9,6 +9,10 @@
 **/.pnp.js
 
 **/UI_Mapping/
+**/CLAUDE.md 
+**/workflow_orchestration.md
+**/tasks/
+**/notes/
 
 # --- Next.js build output ---
 **/.next/
