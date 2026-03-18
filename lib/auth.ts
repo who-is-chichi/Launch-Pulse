@@ -9,6 +9,7 @@ export interface JwtPayload {
   email: string;
   orgId: string;
   role: string;
+  tokenVersion: number;  // ← add this field
 }
 
 function getSecret(): Uint8Array {
