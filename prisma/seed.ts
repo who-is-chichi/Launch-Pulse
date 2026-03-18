@@ -1,10 +1,25 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { runInsightEngine } from '../lib/insight-engine';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
+
+  // Seed demo user (idempotent)
+  const passwordHash = await bcrypt.hash('password123', 12);
+  await prisma.user.upsert({
+    where: { email: 'alex@company.com' },
+    update: {},
+    create: {
+      email: 'alex@company.com',
+      passwordHash,
+      name: 'Alex Thompson',
+      role: 'analytics_manager',
+      orgId: 'org_default',
+    },
+  });
 
   // Brand
   const brand = await prisma.brand.upsert({

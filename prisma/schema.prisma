@@ -7,6 +7,18 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("viewer")
+  orgId        String   @default("org_default")
+  tokenVersion Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Brand {
   id                 String               @id @default(cuid())
   code               String               @unique
