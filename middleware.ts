@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout'];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPublic =
@@ -12,13 +13,28 @@ export function middleware(request: NextRequest) {
 
   if (isPublic) return NextResponse.next();
 
-  const session = request.cookies.get('session');
-  if (!session || session.value !== 'authenticated') {
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+
+  if (!token) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  return NextResponse.next();
+  const payload = await verifyToken(token);
+  if (!payload) {
+    // Token present but invalid/expired — clear stale cookie and redirect
+    const response = NextResponse.redirect(new URL('/login', request.url));
+    response.cookies.delete(COOKIE_NAME);
+    return response;
+  }
+
+  // Inject user identity into request headers for downstream API routes
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-user-id', payload.userId);
+  requestHeaders.set('x-user-email', payload.email);
+  requestHeaders.set('x-user-role', payload.role);
+  requestHeaders.set('x-org-id', payload.orgId);
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {
