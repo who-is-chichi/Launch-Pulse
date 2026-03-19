@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sortBySeverityDesc } from '@/lib/severity';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ kpiTiles, insights, actions, dataRun });
   } catch (err) {
-    console.error({ route: '[home GET]', error: err instanceof Error ? err.message : err, ts: new Date().toISOString() });
+    logger.error('Internal server error', { route: 'GET /api/home', error: err instanceof Error ? err.message : err });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
