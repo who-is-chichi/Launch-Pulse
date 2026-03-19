@@ -13,6 +13,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import UploadMappingWizard from './UploadMappingWizard';
+import { toast } from 'sonner';
 
 interface Dataset {
   id: string;
@@ -109,20 +110,26 @@ export default function DataMappingClient({
 
   const saveEdit = async () => {
     if (!editingConfig) return;
-    const res = await fetch('/api/data-mapping/configs', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: editingConfig.id, status: editStatus, brandCode }),
-    });
-    if (res.ok) {
-      const { config } = await res.json();
-      setConfigs((prev) =>
-        prev.map((c) =>
-          c.id === config.id
-            ? { ...c, status: config.status, lastUpdated: config.lastUpdated }
-            : c
-        )
-      );
+    try {
+      const res = await fetch('/api/data-mapping/configs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingConfig.id, status: editStatus, brandCode }),
+      });
+      if (res.ok) {
+        const { config } = await res.json();
+        setConfigs((prev) =>
+          prev.map((c) =>
+            c.id === config.id
+              ? { ...c, status: config.status, lastUpdated: config.lastUpdated }
+              : c
+          )
+        );
+      } else {
+        toast.error('Failed to update mapping status');
+      }
+    } catch {
+      toast.error('Failed to update mapping status');
     }
     setEditingConfig(null);
   };

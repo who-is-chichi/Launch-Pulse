@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFilters } from '@/components/FilterContext';
 import { INSIGHT_STATUSES } from '@/lib/severity';
+import { toast } from 'sonner';
 
 interface Driver { label: string; confidence: number; description: string; }
 interface MetricChange { metric: string; before: string; after: string; change: string; changePercent: string; direction: string; }
@@ -170,9 +171,11 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       });
       if (!res.ok) {
         setCurrentStatus(previousStatus);
+        toast.error('Failed to update status');
       }
     } catch {
       setCurrentStatus(previousStatus);
+      toast.error('Failed to update status');
     }
   };
 
@@ -201,6 +204,7 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       }, 1200);
     } catch {
       setActionError('Failed to create action. Please try again.');
+      toast.error('Failed to create action. Please try again.');
     } finally {
       setActionSubmitting(false);
     }
@@ -235,7 +239,7 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
             <Download className="w-4 h-4" />
             Export Slide
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success('Link copied'); }}>
             <Share2 className="w-4 h-4" />
             Share
           </Button>
@@ -455,13 +459,19 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
               />
               <div className="flex items-center gap-2 mt-2">
                 <Button size="sm" onClick={async () => {
-                  await fetch(`/api/insights/${insight.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes: notesValue, brandCode }),
-                  });
-                  setNotesSaved(true);
-                  setTimeout(() => setNotesSaved(false), 2000);
+                  try {
+                    const res = await fetch(`/api/insights/${insight.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ notes: notesValue, brandCode }),
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    setNotesSaved(true);
+                    setTimeout(() => setNotesSaved(false), 2000);
+                    toast.success('Notes saved');
+                  } catch {
+                    toast.error('Failed to save notes');
+                  }
                 }}>Save Notes</Button>
                 {notesSaved && <span className="text-xs text-[#16A34A]">Saved</span>}
               </div>

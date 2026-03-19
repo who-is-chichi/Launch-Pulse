@@ -13,7 +13,7 @@ const navItems = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ lastRunAt }: { lastRunAt?: string }) {
   const pathname = usePathname();
 
   return (
@@ -75,7 +75,7 @@ export default function Sidebar() {
             <span className="text-[10px] font-semibold text-[#16A34A] uppercase tracking-wider">Live</span>
           </div>
           <div className="text-[11px] text-[#64748B]">Last data drop</div>
-          <div className="text-xs font-semibold text-[#0F172A]" style={{ fontVariantNumeric: 'tabular-nums' }}>2026-03-05 06:10 ET</div>
+          <div className="text-xs font-semibold text-[#0F172A]" style={{ fontVariantNumeric: 'tabular-nums' }}>{lastRunAt ?? '—'}</div>
         </div>
       </div>
     </aside>
