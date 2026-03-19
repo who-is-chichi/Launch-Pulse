@@ -23,7 +23,7 @@ model Brand {
   id                 String               @id @default(cuid())
   code               String               @unique
   name               String
-  orgId              String?              // future RBAC — tenant isolation key
+  orgId              String   @default("org_default")
   dataRuns           DataRun[]
   insights           Insight[]
   actions            Action[]
@@ -313,4 +313,18 @@ model PublishedMapping {
   fieldCount  Int      @default(0)
   status      String   @default("Active")
   createdAt   DateTime @default(now())
+}
+
+model UserPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  notifyHighSeverity  Boolean  @default(true)
+  notifyActionsDue    Boolean  @default(true)
+  notifyWeeklySummary Boolean  @default(false)
+  notifyDataFreshness Boolean  @default(true)
+  defaultBrand        String   @default("ONC-101")
+  defaultTimeWindow   String   @default("Last 7 days")
+  defaultGeography    String   @default("Nation")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

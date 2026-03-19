@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { validateActionPatchBody } from '@/lib/actions-validation';
+import { Brand } from '@prisma/client';
+import { getOrgId, assertBrandAccess } from '@/lib/request-context';
 
 export async function PATCH(
   request: NextRequest,
@@ -14,16 +16,25 @@ export async function PATCH(
 
   const { status, impactScore, notes, ownerRole, brandCode } = body;
 
+  if (!brandCode) {
+    return NextResponse.json({ error: 'brandCode is required' }, { status: 400 });
+  }
+
   try {
-    if (brandCode) {
-      const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
-      const existing = brand
-        ? await prisma.action.findUnique({ where: { id }, select: { brandId: true } })
-        : null;
-      if (!brand || !existing || existing.brandId !== brand.id) {
-        logger.error('Action brand mismatch', { route: '[actions PATCH]', id, brandCode });
-        return NextResponse.json({ error: 'Action not found' }, { status: 404 });
-      }
+    let orgId: string;
+    let brand: Brand;
+    try {
+      orgId = getOrgId(request);
+      brand = await assertBrandAccess(orgId, brandCode, 'PATCH /api/actions/[id]');
+    } catch (err) {
+      const httpStatus = (err as { status?: number }).status ?? 401;
+      return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
+    }
+
+    const existing = await prisma.action.findUnique({ where: { id }, select: { brandId: true } });
+    if (!existing || existing.brandId !== brand.id) {
+      logger.error('Action brand mismatch', { route: 'PATCH /api/actions/[id]', id, brandCode });
+      return NextResponse.json({ error: 'Action not found' }, { status: 404 });
     }
 
     const updateData: Record<string, string | null> = {};
@@ -50,7 +61,7 @@ export async function PATCH(
 
     return NextResponse.json({ action });
   } catch (err) {
-    logger.error('Failed to update action', { route: '[actions PATCH]', error: err instanceof Error ? err.message : String(err) });
+    logger.error('Failed to update action', { route: 'PATCH /api/actions/[id]', error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to update action' },
       { status: 500 },

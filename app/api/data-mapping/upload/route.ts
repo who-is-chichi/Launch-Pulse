@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { Brand } from '@prisma/client';
+import { getOrgId, assertBrandAccess } from '@/lib/request-context';
 
 interface RuleInput {
   hubValue: string;
@@ -21,9 +23,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
-    if (!brand) {
-      return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    let orgId: string;
+    let brand: Brand;
+    try {
+      orgId = getOrgId(request);
+      brand = await assertBrandAccess(orgId, brandCode, 'POST /api/data-mapping/upload');
+    } catch (err) {
+      const httpStatus = (err as { status?: number }).status ?? 401;
+      return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
     }
 
     let imported = 0;
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, imported });
   } catch (err) {
-    logger.error('Failed to upload mapping', { route: 'data-mapping/upload POST', error: err instanceof Error ? err.message : String(err) });
+    logger.error('Failed to upload mapping', { route: 'POST /api/data-mapping/upload', error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ error: 'Failed to upload mapping' }, { status: 500 });
   }
 }

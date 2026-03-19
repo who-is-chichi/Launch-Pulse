@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { Brand } from '@prisma/client';
+import { getOrgId, assertBrandAccess } from '@/lib/request-context';
 
 const SEVERITY_COLOR: Record<string, string> = {
   High: '#991B1B',
@@ -70,9 +72,14 @@ export async function GET(request: NextRequest) {
     const brandCode = searchParams.get('brand') ?? 'ONC-101';
     const runId = searchParams.get('runId');
 
-    const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
-    if (!brand) {
-      return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    let orgId: string;
+    let brand: Brand;
+    try {
+      orgId = getOrgId(request);
+      brand = await assertBrandAccess(orgId, brandCode, 'GET /api/export/exec-pack');
+    } catch (err) {
+      const httpStatus = (err as { status?: number }).status ?? 401;
+      return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
     }
 
     const dataRun = runId
@@ -301,7 +308,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
-    logger.error('exec-pack export failed', { route: '[export/exec-pack]', error: err instanceof Error ? err.message : String(err) });
+    logger.error('exec-pack export failed', { route: 'GET /api/export/exec-pack', error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ error: 'Failed to generate exec pack' }, { status: 500 });
   }
 }

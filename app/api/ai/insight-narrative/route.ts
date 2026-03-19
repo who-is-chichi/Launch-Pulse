@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { anthropic } from '@/lib/anthropic';
 import { logger } from '@/lib/logger';
+import { checkApiRateLimit } from '@/lib/api-rate-limit';
 
 const SYSTEM_PROMPT = `You are a pharmaceutical launch analytics AI. Given structured insight data for a single insight, write 2-3 sentences of plain-English narrative explaining what happened, why it matters commercially, and what's at stake if left unaddressed. Be grounded strictly in the provided data — do not invent numbers, percentages, or facts not present in the input. Write in a direct, professional tone suited for commercial leadership.
 
 Return only the narrative text. No JSON, no markdown, no headers.`;
 
 export async function POST(request: NextRequest) {
+  const userId = request.headers.get('x-user-id') ?? 'anonymous';
+  const rl = checkApiRateLimit(userId, 'ai');
+  if (!rl.allowed) {
+    logger.warn('AI rate limit exceeded', { route: 'ai/insight-narrative', userId });
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait before trying again.' },
+      {
+        status: 429,
+        headers: rl.retryAfterSeconds ? { 'Retry-After': String(rl.retryAfterSeconds) } : undefined,
+      },
+    );
+  }
+
   try {
     const body = await request.json();
     const { headline, pillar, severity, confidence, impact, region, drivers, metricChanges, contributors } = body;
