@@ -9,7 +9,7 @@ async function main() {
 
   // Seed demo user (idempotent)
   const passwordHash = await bcrypt.hash('password123', 12);
-  await prisma.user.upsert({
+  const demoUser = await prisma.user.upsert({
     where: { email: 'alex@company.com' },
     update: {},
     create: {
@@ -21,11 +21,17 @@ async function main() {
     },
   });
 
+  await prisma.userPreference.upsert({
+    where: { userId: demoUser.id },
+    update: {},
+    create: { userId: demoUser.id },
+  });
+
   // Brand
   const brand = await prisma.brand.upsert({
     where: { code: 'ONC-101' },
-    update: {},
-    create: { code: 'ONC-101', name: 'ONC-101 Oncology' },
+    update: { orgId: 'org_default' },
+    create: { code: 'ONC-101', name: 'ONC-101 Oncology', orgId: 'org_default' },
   });
 
   // Idempotent: clear all existing data for this brand before re-seeding

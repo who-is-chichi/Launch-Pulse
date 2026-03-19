@@ -1,6 +1,7 @@
 import { FilterProvider } from '@/components/FilterContext';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
+import { Toaster } from 'sonner';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      <Toaster position="bottom-right" richColors />
     </FilterProvider>
   );
 }

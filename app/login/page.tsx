@@ -34,15 +34,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSSO = async () => {
-    await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'sso@company.com', password: 'sso' }),
-    });
-    router.push('/home');
-  };
-
   return (
     <div className="min-h-screen bg-[#F1F5F9] flex">
       {/* Left panel — branded */}
@@ -174,24 +165,6 @@ export default function LoginPage() {
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </form>
-
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#E2E8F0]"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-white text-[#94A3B8]">or</span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-11 rounded-xl"
-              onClick={handleSSO}
-            >
-              Sign in with SSO
-            </Button>
 
             <p className="text-[11px] text-[#94A3B8] text-center mt-6">
               Your data is encrypted and secure. All access is logged and audited.

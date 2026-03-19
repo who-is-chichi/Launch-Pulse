@@ -2,27 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { runInsightEngine } from '@/lib/insight-engine';
 import { logger } from '@/lib/logger';
+import { getOrgId, assertBrandAccess } from '@/lib/request-context';
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: dataRunId } = await params;
-    const body = await _request.json().catch(() => ({}));
-    const { brandCode } = body as { brandCode?: string };
 
-    const dataRun = await prisma.dataRun.findUnique({ where: { id: dataRunId } });
+    const dataRun = await prisma.dataRun.findUnique({
+      where: { id: dataRunId },
+      include: { brand: { select: { code: true } } },
+    });
     if (!dataRun) {
       return NextResponse.json({ error: 'DataRun not found' }, { status: 404 });
     }
 
-    if (brandCode) {
-      const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
-      if (!brand || dataRun.brandId !== brand.id) {
-        logger.error('DataRun brand mismatch', { route: '[runs/[id]/generate-insights POST]', id: dataRunId, brandCode });
-        return NextResponse.json({ error: 'DataRun not found' }, { status: 404 });
-      }
+    const brandCode = dataRun.brand.code;
+
+    let orgId: string;
+    try {
+      orgId = getOrgId(request);
+      await assertBrandAccess(orgId, brandCode, 'POST /api/runs/[id]/generate-insights');
+    } catch (err) {
+      const httpStatus = (err as { status?: number }).status ?? 401;
+      return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
     }
 
     if (dataRun.status !== 'complete') {
@@ -33,7 +38,7 @@ export async function POST(
 
     return NextResponse.json({ ok: true, dataRunId, insightsCreated });
   } catch (err) {
-    logger.error('Generate insights failed', { route: '[runs/[id]/generate-insights POST]', error: err instanceof Error ? err.message : String(err) });
+    logger.error('Generate insights failed', { route: 'POST /api/runs/[id]/generate-insights', error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Engine run failed' },
       { status: 500 },

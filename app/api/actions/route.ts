@@ -1,27 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma, Brand } from '@prisma/client';
 import { logger } from '@/lib/logger';
 import { validateActionBody } from '@/lib/actions-validation';
+import { getOrgId, assertBrandAccess } from '@/lib/request-context';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const brandCode = searchParams.get('brand') ?? 'ONC-101';
   const status = searchParams.get('status');
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') ?? '25', 10)));
+  const skip = (page - 1) * pageSize;
 
-  const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
-  if (!brand) return NextResponse.json({ actions: [], impactScores: [] });
+  let orgId: string;
+  let brand: Brand;
+  try {
+    orgId = getOrgId(request);
+    brand = await assertBrandAccess(orgId, brandCode, 'GET /api/actions');
+  } catch (err) {
+    const httpStatus = (err as { status?: number }).status ?? 401;
+    return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
+  }
 
   const where: Prisma.ActionWhereInput = { brandId: brand.id };
   if (status) where.status = status;
 
-  const actions = await prisma.action.findMany({
-    where,
-    include: { impactScore: true },
-    orderBy: { dueDate: 'asc' },
-  });
+  const [actions, total] = await prisma.$transaction([
+    prisma.action.findMany({ where, include: { impactScore: true }, orderBy: { dueDate: 'asc' }, skip, take: pageSize }),
+    prisma.action.count({ where }),
+  ]);
 
-  return NextResponse.json({ actions });
+  return NextResponse.json({
+    actions,
+    pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -32,8 +45,15 @@ export async function POST(request: NextRequest) {
 
     const { brandCode = 'ONC-101', title, linkedInsight, owner, ownerRole, dueDate, severity, expectedLag, insightId, notes } = body;
 
-    const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
-    if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    let orgId: string;
+    let brand: Brand;
+    try {
+      orgId = getOrgId(request);
+      brand = await assertBrandAccess(orgId, brandCode, 'POST /api/actions');
+    } catch (err) {
+      const httpStatus = (err as { status?: number }).status ?? 401;
+      return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
+    }
 
     const action = await prisma.action.create({
       data: {
@@ -53,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ action }, { status: 201 });
   } catch (err) {
-    logger.error('Failed to create action', { route: '[actions POST]', error: err instanceof Error ? err.message : String(err) });
+    logger.error('Failed to create action', { route: 'POST /api/actions', error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to create action' },
       { status: 500 },

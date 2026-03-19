@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { anthropic } from '@/lib/anthropic';
 import { logger } from '@/lib/logger';
+import { checkApiRateLimit } from '@/lib/api-rate-limit';
 
 interface InsightForSummary {
   id: string;
@@ -54,6 +55,19 @@ OUTPUT SCHEMA:
 Return only the JSON object. No markdown, no code fences, no explanation.`;
 
 export async function POST(request: NextRequest) {
+  const userId = request.headers.get('x-user-id') ?? 'anonymous';
+  const rl = checkApiRateLimit(userId, 'ai');
+  if (!rl.allowed) {
+    logger.warn('AI rate limit exceeded', { route: 'ai/summary', userId });
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait before trying again.' },
+      {
+        status: 429,
+        headers: rl.retryAfterSeconds ? { 'Retry-After': String(rl.retryAfterSeconds) } : undefined,
+      },
+    );
+  }
+
   try {
     const body = await request.json();
     const insights: InsightForSummary[] = body.insights ?? [];
