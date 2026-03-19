@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, Download, UserPlus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import PillarTag from '@/components/PillarTag';
 import SeverityBadge from '@/components/SeverityBadge';
 import {
@@ -18,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
 import AISummaryPanel from '@/components/AISummaryPanel';
+import { exportInsightsToCsv } from '@/lib/export-csv';
 
 interface Insight {
   id: string;
@@ -53,6 +55,7 @@ export default function InsightsClient({
   const searchParams = useSearchParams();
   const [selectedPillar, setSelectedPillar] = useState('all');
   const [selectedSeverity, setSelectedSeverity] = useState('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { geography, searchQuery } = useFilters();
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -98,9 +101,17 @@ export default function InsightsClient({
           <p className="text-sm text-[#64748B]">Explore and manage all insights across your launch</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={selectedIds.size === 0}
+            onClick={() => {
+              const toExport = initialInsights.filter(i => selectedIds.has(i.id));
+              exportInsightsToCsv(toExport);
+            }}
+          >
             <Download className="w-4 h-4" />
-            Export Selected
+            {selectedIds.size > 0 ? `Export (${selectedIds.size})` : 'Export Selected'}
           </Button>
           <Button variant="outline" className="gap-2">
             <UserPlus className="w-4 h-4" />
@@ -166,7 +177,13 @@ export default function InsightsClient({
             <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
               <tr>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
-                  <input type="checkbox" className="rounded border-[#CBD5E1]" />
+                  <Checkbox
+                    checked={filteredInsights.length > 0 && filteredInsights.every(i => selectedIds.has(i.id))}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedIds(new Set(filteredInsights.map(i => i.id)));
+                      else setSelectedIds(new Set());
+                    }}
+                  />
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Headline</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Pillar</th>
@@ -182,7 +199,14 @@ export default function InsightsClient({
                 filteredInsights.map((insight) => (
                   <tr key={insight.id} className="hover:bg-[#F8FAFC] transition-colors">
                     <td className="px-4 py-4">
-                      <input type="checkbox" className="rounded border-[#CBD5E1]" />
+                      <Checkbox
+                        checked={selectedIds.has(insight.id)}
+                        onCheckedChange={(checked) => setSelectedIds(prev => {
+                          const next = new Set(prev);
+                          checked ? next.add(insight.id) : next.delete(insight.id);
+                          return next;
+                        })}
+                      />
                     </td>
                     <td className="px-4 py-4">
                       <Link

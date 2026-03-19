@@ -9,6 +9,8 @@ import DecisionRiskPanel from '@/components/DecisionRiskPanel';
 import { Button } from '@/components/ui/button';
 import { Download, FileText, Sparkles, Loader2, X } from 'lucide-react';
 import { useFilters } from '@/components/FilterContext';
+import { logger } from '@/lib/logger';
+import { toast } from 'sonner';
 
 interface KpiTile {
   id: string;
@@ -161,7 +163,8 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setPulseBrief(data.brief);
     } catch (err) {
-      console.error('[HomeClient pulse-brief]', err);
+      logger.error('Pulse brief generation failed', { component: 'HomeClient', error: err instanceof Error ? err.message : err });
+      toast.error('Unable to generate pulse brief. Please try again.');
       setPulseBrief('Unable to generate pulse brief. Please try again.');
     } finally {
       setIsBriefLoading(false);

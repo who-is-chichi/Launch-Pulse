@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Search, Bell, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
+import { NotificationPanel } from './NotificationPanel';
 import { Button } from '../ui/button';
 import {
   DropdownMenu,
@@ -116,10 +117,7 @@ export default function TopBar() {
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="relative rounded-xl">
-          <Bell className="w-[18px] h-[18px] text-[#64748B]" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#DC2626] rounded-full ring-2 ring-white"></span>
-        </Button>
+        <NotificationPanel />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
