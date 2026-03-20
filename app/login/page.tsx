@@ -16,21 +16,36 @@ const features = [
 
 export default function LoginPage() {
   const router = useRouter();
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
     const form = e.currentTarget;
     const email = (form.elements.namedItem('email') as HTMLInputElement).value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
 
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (res.ok) {
-      router.push('/home');
+      if (res.ok) {
+        // Use window.location to ensure the browser commits the Set-Cookie header
+        // before the next navigation — router.push() can race with cookie commit.
+        window.location.href = '/home';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? 'Invalid email or password');
+        setLoading(false);
+      }
+    } catch {
+      setError('Unable to connect. Please try again.');
+      setLoading(false);
     }
   };
 
@@ -160,9 +175,15 @@ export default function LoginPage() {
                 />
               </div>
 
-              <Button type="submit" className="w-full h-11 rounded-xl gap-2 text-sm">
-                Sign In
-                <ArrowRight className="w-4 h-4" />
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+                  {error}
+                </p>
+              )}
+
+              <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl gap-2 text-sm">
+                {loading ? 'Signing in…' : 'Sign In'}
+                {!loading && <ArrowRight className="w-4 h-4" />}
               </Button>
             </form>
 
