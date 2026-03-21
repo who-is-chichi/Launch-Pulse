@@ -351,6 +351,9 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Upload Mapping Wizard"
         className="fixed inset-y-0 right-0 z-50 w-full max-w-[820px] bg-white shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >

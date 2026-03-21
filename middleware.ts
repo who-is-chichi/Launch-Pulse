@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout'];
+const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/verify-session'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,22 +27,25 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Verify the user still exists and their tokenVersion matches — this invalidates tokens
-  // for deleted users or after forced logout (tokenVersion increment).
-  // Trade-off: 1 extra DB query per authenticated request; acceptable for a small team.
-  // Fail-closed: if the DB is unreachable, deny access rather than allow a potentially invalid session.
-  let dbUser: { tokenVersion: number } | null = null;
+  // Verify the user still exists and their tokenVersion matches via an internal API route.
+  // PrismaClient cannot run in the Edge Runtime (middleware), so we delegate the DB check
+  // to a Node.js API route protected by INTERNAL_SECRET.
+  // Fail-closed: non-200 response → deny access.
   try {
-    dbUser = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { tokenVersion: true },
+    const verifyUrl = new URL('/api/auth/verify-session', request.url);
+    const verifyRes = await fetch(verifyUrl.toString(), {
+      headers: {
+        'x-internal-secret': process.env.INTERNAL_SECRET ?? '',
+        'x-user-id': payload.userId,
+        'x-token-version': String(payload.tokenVersion),
+      },
     });
+    if (!verifyRes.ok) {
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.delete(COOKIE_NAME);
+      return response;
+    }
   } catch {
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.delete(COOKIE_NAME);
-    return response;
-  }
-  if (!dbUser || dbUser.tokenVersion !== payload.tokenVersion) {
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete(COOKIE_NAME);
     return response;

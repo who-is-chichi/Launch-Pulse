@@ -394,9 +394,9 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
       {showManualModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowManualModal(false)} />
-          <div className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 w-full max-w-md mx-4 overflow-y-auto max-h-[90vh]" style={{ boxShadow: '0 8px 40px rgba(15,23,42,0.15)' }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="create-manual-action-title" className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 w-full max-w-md mx-4 overflow-y-auto max-h-[90vh]" style={{ boxShadow: '0 8px 40px rgba(15,23,42,0.15)' }}>
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-semibold text-[#0F172A]">Create Action Item</h3>
+              <h3 id="create-manual-action-title" className="text-base font-semibold text-[#0F172A]">Create Action Item</h3>
               <button onClick={() => setShowManualModal(false)} className="text-[#CBD5E1] hover:text-[#64748B] transition-colors">
                 <X className="w-4 h-4" />
               </button>
@@ -461,9 +461,9 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
       {impactModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleImpactSkip} />
-          <div className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 w-full max-w-md mx-4" style={{ boxShadow: '0 8px 40px rgba(15,23,42,0.15)' }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="record-impact-title" className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 w-full max-w-md mx-4" style={{ boxShadow: '0 8px 40px rgba(15,23,42,0.15)' }}>
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-base font-semibold text-[#0F172A]">Record Impact</h3>
+              <h3 id="record-impact-title" className="text-base font-semibold text-[#0F172A]">Record Impact</h3>
               <button onClick={handleImpactSkip} className="text-[#CBD5E1] hover:text-[#64748B] transition-colors">
                 <X className="w-4 h-4" />
               </button>

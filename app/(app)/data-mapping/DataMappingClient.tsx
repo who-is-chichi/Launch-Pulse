@@ -443,8 +443,8 @@ export default function DataMappingClient({
       {/* Edit Status Modal */}
       {editingConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 w-80 shadow-xl">
-            <h3 className="font-semibold text-[#0F172A] mb-4">Edit Mapping Status</h3>
+          <div role="dialog" aria-modal="true" aria-labelledby="edit-mapping-title" className="bg-white rounded-2xl border border-[#E2E8F0] p-6 w-80 shadow-xl">
+            <h3 id="edit-mapping-title" className="font-semibold text-[#0F172A] mb-4">Edit Mapping Status</h3>
             <p className="text-sm text-[#64748B] mb-3">{editingConfig.dataset}</p>
             <select
               value={editStatus}
