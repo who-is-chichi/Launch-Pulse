@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Filter, Download, UserPlus } from 'lucide-react';
+import { Filter, Download, UserPlus, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -56,8 +57,17 @@ export default function InsightsClient({
   const [selectedPillar, setSelectedPillar] = useState('all');
   const [selectedSeverity, setSelectedSeverity] = useState('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const { geography, searchQuery } = useFilters();
+  const { geography, searchQuery, brand, timeWindow } = useFilters();
+  const [isRunning, setIsRunning] = useState(false);
   const totalPages = Math.ceil(totalCount / pageSize);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('brand', brand);
+    params.set('timeWindow', timeWindow);
+    params.set('page', '1');
+    router.push(`/insights?${params.toString()}`);
+  }, [brand, timeWindow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredInsights = initialInsights.filter((insight) => {
     const matchesPillar = selectedPillar === 'all' || insight.pillar.toLowerCase() === selectedPillar;
@@ -101,6 +111,36 @@ export default function InsightsClient({
           <p className="text-sm text-[#64748B]">Explore and manage all insights across your launch</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={isRunning}
+            onClick={async () => {
+              setIsRunning(true);
+              try {
+                const res = await fetch('/api/engine/run', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ brandCode: brand }),
+                });
+                if (res.status === 429) {
+                  toast.error('Rate limited — try again shortly');
+                } else if (!res.ok) {
+                  toast.error('Engine run failed');
+                } else {
+                  toast.success('Insights refreshed');
+                  router.refresh();
+                }
+              } catch {
+                toast.error('Engine run failed');
+              } finally {
+                setIsRunning(false);
+              }
+            }}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRunning ? 'animate-spin' : ''}`} />
+            {isRunning ? 'Running...' : 'Refresh Insights'}
+          </Button>
           <Button
             variant="outline"
             className="gap-2"

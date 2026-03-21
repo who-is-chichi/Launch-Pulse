@@ -34,6 +34,20 @@ export async function GET(
       metricChanges: true,
       contributors: { orderBy: { sortOrder: 'asc' } },
       risks: { orderBy: { sortOrder: 'asc' } },
+      actions: {
+        select: {
+          id: true,
+          title: true,
+          owner: true,
+          ownerRole: true,
+          dueDate: true,
+          severity: true,
+          status: true,
+          expectedLag: true,
+          linkedInsight: true,
+        },
+        orderBy: { dueDate: 'asc' },
+      },
     },
   });
 

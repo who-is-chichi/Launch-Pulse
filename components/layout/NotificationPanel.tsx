@@ -21,7 +21,7 @@ export function NotificationPanel() {
     setLoading(true);
     try {
       const [insRes, actRes] = await Promise.all([
-        fetch(`/api/insights?brand=${brand}&pageSize=5&severity=critical`),
+        fetch(`/api/insights?brand=${brand}&pageSize=5&severity=High`),
         fetch(`/api/actions?brand=${brand}&pageSize=5`),
       ]);
       if (insRes.ok) {

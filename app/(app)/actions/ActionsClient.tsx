@@ -226,7 +226,7 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
       const res = await fetch(`/api/actions/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, ...(impactScore ? { impactScore } : {}) }),
+        body: JSON.stringify({ brandCode: brand, status: newStatus, ...(impactScore ? { impactScore } : {}) }),
       });
       if (!res.ok) setActions(prev);
     } catch {

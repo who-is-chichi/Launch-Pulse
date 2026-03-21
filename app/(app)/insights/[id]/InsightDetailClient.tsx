@@ -52,6 +52,7 @@ function AIInsightNarrative({ insight }: InsightDetailProps) {
   const [narrative, setNarrative] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     setIsGenerating(true);
@@ -72,12 +73,13 @@ function AIInsightNarrative({ insight }: InsightDetailProps) {
     })
       .then(async r => {
         const data = await r.json();
-        if (!r.ok || data.error) setError(data.error ?? `HTTP ${r.status}`);
+        if (r.status === 429) setError('Rate limited — try again in a moment');
+        else if (!r.ok || data.error) setError(data.error ?? `HTTP ${r.status}`);
         else setNarrative(data.narrative);
       })
       .catch(() => setError('Unable to generate narrative.'))
       .finally(() => setIsGenerating(false));
-  }, [insight.headline]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [insight.headline, retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <motion.div
@@ -122,9 +124,21 @@ function AIInsightNarrative({ insight }: InsightDetailProps) {
               ))}
             </div>
           </div>
+        ) : error ? (
+          <div>
+            <p className="text-sm text-[#334155] leading-relaxed bg-white/70 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/80">
+              {error}
+            </p>
+            <button
+              onClick={() => { setError(null); setRetryCount(c => c + 1); }}
+              className="mt-2 text-xs text-[#1D4ED8] hover:underline"
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <p className="text-sm text-[#334155] leading-relaxed bg-white/70 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/80">
-            {error ?? narrative ?? ''}
+            {narrative ?? ''}
           </p>
         )}
         <p className="text-[10px] text-[#CBD5E1] mt-3">AI-generated interpretation. Verify before taking action.</p>
@@ -172,6 +186,8 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       if (!res.ok) {
         setCurrentStatus(previousStatus);
         toast.error('Failed to update status');
+      } else {
+        toast.success('Status updated');
       }
     } catch {
       setCurrentStatus(previousStatus);
@@ -447,15 +463,6 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
                 rows={3}
                 value={notesValue}
                 onChange={e => setNotesValue(e.target.value)}
-                onBlur={async () => {
-                  await fetch(`/api/insights/${insight.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes: notesValue, brandCode }),
-                  });
-                  setNotesSaved(true);
-                  setTimeout(() => setNotesSaved(false), 2000);
-                }}
               />
               <div className="flex items-center gap-2 mt-2">
                 <Button size="sm" onClick={async () => {
