@@ -5,71 +5,57 @@
 
 ---
 
-# Sprint 8 — Multi-Tenancy Enforcement + Settings
+# Sprint 9 — UX Completeness
 
-## Status: COMPLETE
+## Status: IN PROGRESS
 
 ## Tasks
 
-### Schema + Lib
-- [x] Change Brand.orgId from nullable to NOT NULL with default "org_default"
-- [x] Add UserPreference model to prisma/schema.prisma
-- [x] Run `npx prisma migrate dev --name sprint8_schema`
-- [x] Update prisma/seed.ts — add orgId to brand upsert, add UserPreference seed
-- [x] Create lib/request-context.ts (getOrgId, getUserId, getUserRole, assertBrandAccess)
-- [x] Create lib/api-rate-limit.ts (checkApiRateLimit — sliding window, AI: 20/min, engine: 5/min)
-- [x] npx prisma db seed — passes ✅
+### Pre-work
+- [x] Write tasks/todo.md
 
-### API Route Enforcement (orgId on all routes)
-- [x] app/api/brands/route.ts — filter findMany by orgId
-- [x] app/api/insights/route.ts — assertBrandAccess + logger.error fix
-- [x] app/api/insights/[id]/route.ts — require brandCode, assertBrandAccess
-- [x] app/api/actions/route.ts — assertBrandAccess + pagination (page/pageSize)
-- [x] app/api/actions/[id]/route.ts — assertBrandAccess (brandCode in body)
-- [x] app/api/runs/route.ts — assertBrandAccess + logger.error fix
-- [x] app/api/runs/[id]/generate-insights/route.ts — assertBrandAccess
-- [x] app/api/data-status/route.ts — assertBrandAccess + logger.error fix
-- [x] app/api/admin/data-status/route.ts — role guard + assertBrandAccess
-- [x] app/api/engine/run/route.ts — assertBrandAccess + rate limit
-- [x] app/api/data-mapping/configs/route.ts — assertBrandAccess
-- [x] app/api/data-mapping/rules/route.ts — assertBrandAccess
-- [x] app/api/data-mapping/upload/route.ts — assertBrandAccess
-- [x] app/api/export/exec-pack/route.ts — assertBrandAccess
+### Agent A — Quick Wins
+- [x] Fix HomeClient console.error → logger.error
+- [x] Wire Share button (copy link to clipboard + toast) on Insight Detail
+- [x] Verify / wire Save Notes button on Insight Detail
+- [x] Add error toasts (sonner) to Home, Insights list, Insight Detail, Data Mapping catch blocks
+- [x] Fix dynamic "Last data drop" timestamp in Sidebar (remove hardcoded date)
 
-### Settings + UI
-- [x] Create app/api/settings/preferences/route.ts (GET + PATCH, upsert on userId from header)
-- [x] Add PATCH handler to app/api/auth/me/route.ts (name update only)
-- [x] Rewrite app/(app)/settings/page.tsx — controlled state, fetch from both APIs, sonner toasts
-- [x] Add <Toaster /> to app/(app)/layout.tsx
+### Agent B — Export Selected
+- [x] Add `selectedIds: Set<string>` state to InsightsClient
+- [x] Wire checkbox `checked` + `onCheckedChange` on each insight row
+- [x] Add select-all checkbox in table header
+- [x] Disable Export button when no selection; show count badge when selected
+- [x] Create `lib/export-csv.ts` with `exportInsightsToCsv(insights)` helper
+- [x] Wire Export button to download CSV
 
-### AI Rate Limiting
-- [x] app/api/ai/summary/route.ts — checkApiRateLimit
-- [x] app/api/ai/insight-narrative/route.ts — checkApiRateLimit
-- [x] app/api/ai/pulse-brief/route.ts — checkApiRateLimit
+### Agent C — Notification Bell
+- [x] Create `components/layout/NotificationPanel.tsx` (Popover with two sections)
+- [x] Lazy-fetch high-severity insights + due actions on popover open
+- [x] Show loading skeleton + empty state
+- [x] Dynamic red dot: only shown when critical insights or overdue actions exist
+- [x] Wire bell button in TopBar.tsx to NotificationPanel
 
 ### Verification
-- [x] Restart dev server after migration
-- [x] npx tsc --noEmit — zero errors ✅
-- [x] npx vitest run — 44 tests pass ✅
-- [x] npx tsx scripts/qa-check.ts — 114/114 ✅
-- [x] npx tsx scripts/regression-check.ts — passes ✅
+- [x] npx tsc --noEmit — zero errors
+- [x] npx vitest run — 352 tests pass
+- [x] npx tsx scripts/qa-check.ts — 114/114
+- [x] npx tsx scripts/regression-check.ts — 16/16 passes
 
 ### Completion
-- [x] Create notes/2026-03-19-sprint8-multi-tenancy.md
+- [x] Create notes/2026-03-19-sprint9-ux-completeness.md
 - [x] Commit + push + create PR
 
 ---
 
-## Review
+## Post-Sprint 9 — Middleware Edge Runtime Fix (2026-03-21)
 
-All Sprint 8 acceptance criteria met:
-- Brand.orgId enforced: all 14 API routes filter by orgId via assertBrandAccess
-- No bare brand lookups in any route — assertBrandAccess is the single access point
-- UserPreference model added; GET/PATCH /api/settings/preferences wired
-- Settings page: full controlled state, real API calls, sonner toasts
-- AI rate limiting: 20 req/min per user; engine: 5 req/min
-- Pagination on GET /api/actions (page/pageSize, backward compatible)
-- TypeScript clean, 44 vitest tests pass, 114 QA assertions pass
+### Status: COMPLETE
 
-## Next Sprint
-Sprint 9 — UX Completeness
+- [x] Diagnose login redirect loop (middleware Prisma → Edge Runtime incompatibility)
+- [x] Create app/api/auth/verify-session/route.ts (internal tokenVersion check)
+- [x] Update middleware.ts to use fetch instead of Prisma
+- [x] Add INTERNAL_SECRET to .env.local
+- [x] Accessibility: add role/aria-modal/aria-labelledby to modals in ActionsClient, DataMappingClient, UploadMappingWizard, InsightDetailClient
+- [x] Write notes/2026-03-21-middleware-edge-runtime-fix.md
+- [x] npx tsc --noEmit → clean
