@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 // ── Pure helper functions (exported for unit testing) ────────────────────────
 
@@ -89,7 +90,7 @@ export async function evaluateActions(
 
   const newRun = await prisma.dataRun.findUnique({ where: { id: newRunId } });
   if (!newRun) {
-    console.warn(JSON.stringify({ ts: new Date().toISOString(), level: 'warn', message: 'evaluateActions: DataRun not found', runId: newRunId }));
+    logger.warn('evaluateActions: DataRun not found', { runId: newRunId });
     return { evaluated, skipped, errors };
   }
 
@@ -221,13 +222,10 @@ export async function evaluateActions(
 
       evaluated++;
     } catch (err) {
-      console.error(JSON.stringify({
-        ts: new Date().toISOString(),
-        level: 'error',
-        message: 'evaluateActions: error evaluating action',
+      logger.error('evaluateActions: error evaluating action', {
         actionId: action.id,
         error: err instanceof Error ? err.message : String(err),
-      }));
+      });
       errors++;
     }
   }

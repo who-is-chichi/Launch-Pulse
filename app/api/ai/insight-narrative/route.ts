@@ -8,7 +8,8 @@ const SYSTEM_PROMPT = `You are a pharmaceutical launch analytics AI. Given struc
 Return only the narrative text. No JSON, no markdown, no headers.`;
 
 export async function POST(request: NextRequest) {
-  const userId = request.headers.get('x-user-id') ?? 'anonymous';
+  const userId = request.headers.get('x-user-id');
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const rl = checkApiRateLimit(userId, 'ai');
   if (!rl.allowed) {
     logger.warn('AI rate limit exceeded', { route: 'ai/insight-narrative', userId });

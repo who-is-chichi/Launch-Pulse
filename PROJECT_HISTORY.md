@@ -257,6 +257,37 @@ npm run lint                         # ESLint
 
 ---
 
+### Sprint 10 — Security & Compliance Hardening (complete)
+
+**Critical auth bypass fixed:**
+- `app/api/home/route.ts` — added `getOrgId()` + `assertBrandAccess()`, matching the pattern used by all other protected routes. Cross-tenant callers now receive 404 (no resource existence leak).
+
+**AI route hardening:**
+- All 3 AI routes (`insight-narrative`, `pulse-brief`, `summary`) — replaced `?? 'anonymous'` rate-limit fallback with early 401 return when `x-user-id` header is missing.
+
+**Audit trail fix:**
+- `app/api/data-mapping/upload/route.ts` — replaced hardcoded `publishedBy: 'Admin'` with `getUserId(request)`. Added 200-char length validation on `name` field.
+
+**Logger compliance:**
+- `lib/impact-evaluator.ts` — replaced 2 `console.warn/error` calls with `logger.warn/error` (CLAUDE.md rule enforcement).
+
+**Security headers:**
+- `next.config.ts` — added `async headers()` with `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and `Content-Security-Policy` on all routes.
+
+**Input validation:**
+- `app/api/insights/route.ts` — added 200-char length guard on `search` query param (DoS mitigation).
+
+**Test config:**
+- `vitest.config.ts` — restricted collection to `__tests__/**/*.test.ts`, excluding `testing/` Playwright files.
+
+**Verification at Sprint 10 end:**
+- ✅ `npx tsc --noEmit` → 0 errors
+- ✅ `npx vitest run` → 44/44 passing (Playwright files no longer collected)
+- ✅ `npx tsx scripts/qa-check.ts` → 114/114
+- ✅ `npx tsx scripts/regression-check.ts` → 16/16
+
+---
+
 ## MVP Exit Criteria Status
 
 | Criterion | Status |

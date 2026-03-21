@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { Brand } from '@prisma/client';
-import { getOrgId, assertBrandAccess } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, getUserId } from '@/lib/request-context';
 
 interface RuleInput {
   hubValue: string;
@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
 
     if (!brandCode || !dataset) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    if (name && name.length > 200) {
+      return NextResponse.json({ error: 'Name too long (max 200 characters)' }, { status: 400 });
     }
 
     let orgId: string;
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
         brandId: brand.id,
         name: name || `${dataset} Mapping`,
         dataset,
-        publishedBy: 'Admin',
+        publishedBy: getUserId(request) || 'unknown',
         fieldCount: rules.length,
         status: 'Active',
       },

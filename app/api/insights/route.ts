@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
     if (pillar) where.pillar = pillar;
     if (severity) where.severity = severity;
     if (status) where.status = status;
+    if (search && search.length > 200) {
+      return NextResponse.json({ error: 'Search query too long (max 200 characters)' }, { status: 400 });
+    }
     if (search) {
       where.headline = { contains: search, mode: 'insensitive' };
     }

@@ -2,17 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sortBySeverityDesc } from '@/lib/severity';
 import { logger } from '@/lib/logger';
+import { getOrgId, assertBrandAccess } from '@/lib/request-context';
+
+const route = 'GET /api/home';
 
 export async function GET(request: NextRequest) {
+  let orgId: string;
+  try {
+    orgId = getOrgId(request);
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const brandCode = searchParams.get('brand') ?? 'ONC-101';
     const timeWindow = searchParams.get('timeWindow') ?? 'Last 7 days';
     const geography = searchParams.get('geography') ?? 'Nation';
 
-    const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
-    if (!brand) {
-      return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    let brand;
+    try {
+      brand = await assertBrandAccess(orgId, brandCode, route);
+    } catch (err) {
+      const httpStatus = (err as { status?: number }).status ?? 404;
+      return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
     }
 
     const dataRun = await prisma.dataRun.findFirst({
@@ -43,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ kpiTiles, insights, actions, dataRun });
   } catch (err) {
-    logger.error('Internal server error', { route: 'GET /api/home', error: err instanceof Error ? err.message : err });
+    logger.error('Internal server error', { route, error: err instanceof Error ? err.message : err });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
