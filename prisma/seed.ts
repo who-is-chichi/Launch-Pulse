@@ -56,6 +56,7 @@ async function main() {
     await prisma.goldInputSnapshot.deleteMany({ where: { dataRunId: { in: runIds } } });
     await prisma.insight.deleteMany({ where: { dataRunId: { in: runIds } } });
   }
+  await prisma.crosswalkStat.deleteMany({ where: { brandId: brand.id } });
   await prisma.dataRun.deleteMany({ where: { brandId: brand.id } });
   await prisma.claimsMetricsFact.deleteMany({ where: { brandId: brand.id } });
   await prisma.spMetricsFact.deleteMany({ where: { brandId: brand.id } });
@@ -399,6 +400,14 @@ async function main() {
       { brandId: brand.id, name: 'Dispense Weekly v1.3', dataset: 'Dispense', publishedBy: 'Mike Torres', publishedAt: new Date('2026-02-28'), fieldCount: 18, status: 'Active' },
       { brandId: brand.id, name: 'Calls Activity v1.1',  dataset: 'Calls',    publishedBy: 'Sarah Chen',  publishedAt: new Date('2026-01-10'), fieldCount: 15, status: 'Active' },
       { brandId: brand.id, name: 'Claims Weekly v1.9',   dataset: 'Claims',   publishedBy: 'Sarah Chen',  publishedAt: new Date('2025-12-15'), fieldCount: 24, status: 'Superseded' },
+    ],
+  });
+
+  await prisma.crosswalkStat.createMany({
+    data: [
+      { brandId: brand.id, statType: 'npi_coverage', label: 'NPI Coverage', matchRate: 94.2, unmatchedCount: 23, entityType: 'HCP' },
+      { brandId: brand.id, statType: 'account_id_match', label: 'Account ID Match Rate', matchRate: 97.8, unmatchedCount: 14, entityType: 'Account' },
+      { brandId: brand.id, statType: 'territory_alignment', label: 'Territory Alignment', matchRate: 100, unmatchedCount: 0, entityType: '' },
     ],
   });
 

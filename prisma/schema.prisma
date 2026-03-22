@@ -37,6 +37,7 @@ model Brand {
   mappingConfigs     MappingConfig[]
   normalizationRules NormalizationRule[]
   publishedMappings  PublishedMapping[]
+  crosswalkStats     CrosswalkStat[]
 }
 
 model DataRun {
@@ -313,6 +314,20 @@ model PublishedMapping {
   fieldCount  Int      @default(0)
   status      String   @default("Active")
   createdAt   DateTime @default(now())
+}
+
+model CrosswalkStat {
+  id             String   @id @default(cuid())
+  brandId        String
+  brand          Brand    @relation(fields: [brandId], references: [id])
+  statType       String
+  label          String
+  matchRate      Float
+  unmatchedCount Int      @default(0)
+  entityType     String   @default("")
+  updatedAt      DateTime @updatedAt
+
+  @@index([brandId])
 }
 
 model UserPreference {

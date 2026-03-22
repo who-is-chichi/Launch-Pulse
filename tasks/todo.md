@@ -5,6 +5,62 @@
 
 ---
 
+# Sprint 13 — Data Mapping Fixes (2026-03-22)
+
+## Status: COMPLETE
+
+## Context
+Three gaps fixed:
+1. Remove "Test on Sample" button (no backing feature)
+2. Normalization Rules Edit buttons — add real inline edit modal + PATCH API
+3. ID Crosswalk hardcoded data — build CrosswalkStat Prisma model, seed, fetch, render
+
+## Tasks
+
+### Pre-work
+- [x] Write tasks/todo.md
+
+### Agent 1 — Remove Test on Sample button
+- [x] Remove `<Button>` element (lines 164–168) from `DataMappingClient.tsx`
+- [x] Remove unused `Play` import if no longer used
+
+### Agent 2 — Normalization Rules PATCH API
+- [x] Add `PATCH /api/data-mapping/rules` handler to `app/api/data-mapping/rules/route.ts`
+- [x] Validate id, normalizedValue, category, brandCode
+- [x] RBAC: getOrgId + assertBrandAccess + verify brandId ownership
+- [x] Use lib/logger.ts
+
+### Agent 4 — CrosswalkStat schema + migration + seed
+- [x] Add `CrosswalkStat` model to `prisma/schema.prisma`
+- [x] Add `crosswalkStats CrosswalkStat[]` relation to `Brand` model
+- [x] Run `npx prisma migrate dev --name add_crosswalk_stat`
+- [x] Add idempotent seed data to `prisma/seed.ts` (delete + createMany)
+- [x] Run `npx tsx prisma/seed.ts` — verify seeds
+
+### Agent 3 — Normalization Rules edit modal (client)
+- [x] Add editingRule, editNormalizedValue, editCategory state
+- [x] Add openEditRule + saveEditRule functions (fetch PATCH /api/data-mapping/rules)
+- [x] Wire Edit buttons, add accessible modal (role/aria-modal/aria-labelledby)
+- [x] Update local normalizationRules state on save
+
+### Agent 5 — CrosswalkStat server fetch + client render
+- [x] Add crosswalkStats to Promise.all in `data-mapping/page.tsx`
+- [x] Pass as prop to DataMappingClient
+- [x] Replace hardcoded crosswalk arrays with dynamic DB data
+- [x] Dynamic accordion count from stats
+
+### Verification
+- [x] `npx tsc --noEmit` — 0 errors ✅
+- [x] `npx vitest run` — 44/44 ✅
+- [x] `npx tsx scripts/qa-check.ts` — 114/114 ✅
+- [x] `npx tsx scripts/regression-check.ts` — 16/16 ✅
+
+### Completion
+- [x] Create `notes/2026-03-22-sprint13-data-mapping-fixes.md`
+- [ ] Commit
+
+---
+
 # Sprint 9 — UX Completeness
 
 ## Status: IN PROGRESS

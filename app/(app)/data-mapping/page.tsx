@@ -18,7 +18,7 @@ export default async function DataMappingPage({
       })
     : null;
 
-  const [datasets, mappingConfigs, normalizationRules, publishedMappings] = await Promise.all([
+  const [datasets, mappingConfigs, normalizationRules, publishedMappings, crosswalkStats] = await Promise.all([
     dataRun
       ? prisma.dataset.findMany({ where: { dataRunId: dataRun.id }, orderBy: { name: 'asc' } })
       : Promise.resolve([]),
@@ -34,6 +34,9 @@ export default async function DataMappingPage({
           orderBy: { publishedAt: 'desc' },
           take: 10,
         })
+      : Promise.resolve([]),
+    brand
+      ? prisma.crosswalkStat.findMany({ where: { brandId: brand.id }, orderBy: { statType: 'asc' } })
       : Promise.resolve([]),
   ]);
 
@@ -67,6 +70,14 @@ export default async function DataMappingPage({
           : null
       }
       brandCode={brandCode}
+      crosswalkStats={crosswalkStats.map(s => ({
+        id: s.id,
+        statType: s.statType,
+        label: s.label,
+        matchRate: s.matchRate,
+        unmatchedCount: s.unmatchedCount,
+        entityType: s.entityType,
+      }))}
     />
   );
 }
