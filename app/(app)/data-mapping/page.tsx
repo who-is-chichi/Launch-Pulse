@@ -18,7 +18,7 @@ export default async function DataMappingPage({
       })
     : null;
 
-  const [datasets, mappingConfigs, normalizationRules, publishedMappings, crosswalkStats] = await Promise.all([
+  const [datasets, mappingConfigs, normalizationRules, publishedMappings, crosswalkStats, ingestionRuns] = await Promise.all([
     dataRun
       ? prisma.dataset.findMany({ where: { dataRunId: dataRun.id }, orderBy: { name: 'asc' } })
       : Promise.resolve([]),
@@ -38,6 +38,17 @@ export default async function DataMappingPage({
     brand
       ? prisma.crosswalkStat.findMany({ where: { brandId: brand.id }, orderBy: { statType: 'asc' } })
       : Promise.resolve([]),
+    prisma.bronzeCtlIngestionRun.findMany({
+      where: brand ? { brandId: brand.id } : { brandId: 'none' },
+      orderBy: { startedAt: 'desc' },
+      take: 5,
+      include: {
+        fileManifests: {
+          orderBy: { receivedTs: 'desc' },
+          take: 3,
+        },
+      },
+    }),
   ]);
 
   return (
@@ -78,6 +89,24 @@ export default async function DataMappingPage({
         unmatchedCount: s.unmatchedCount,
         entityType: s.entityType,
       }))}
+      ingestionRuns={JSON.parse(JSON.stringify(ingestionRuns.map(run => ({
+        id: run.id,
+        sourceSystem: run.sourceSystem,
+        sourceFeedName: run.sourceFeedName,
+        status: run.status,
+        startedAt: run.startedAt,
+        endedAt: run.endedAt,
+        recordsLoaded: run.recordsLoaded !== null ? Number(run.recordsLoaded) : null,
+        recordsRejected: run.recordsRejected !== null ? Number(run.recordsRejected) : null,
+        triggerType: run.triggerType,
+        fileManifests: run.fileManifests.map(f => ({
+          id: f.id,
+          sourceFileName: f.sourceFileName,
+          rowCountLoaded: f.rowCountLoaded !== null ? Number(f.rowCountLoaded) : null,
+          rowCountRejected: f.rowCountRejected !== null ? Number(f.rowCountRejected) : null,
+          status: f.status,
+        })),
+      }))))}
     />
   );
 }

@@ -64,6 +64,27 @@ interface CrosswalkStat {
   entityType: string;
 }
 
+interface FileManifest {
+  id: string;
+  sourceFileName: string | null;
+  rowCountLoaded: number | null;
+  rowCountRejected: number | null;
+  status: string | null;
+}
+
+interface IngestionRun {
+  id: string;
+  sourceSystem: string;
+  sourceFeedName: string;
+  status: string;
+  startedAt: string;
+  endedAt: string | null;
+  recordsLoaded: number | null;
+  recordsRejected: number | null;
+  triggerType: string | null;
+  fileManifests: FileManifest[];
+}
+
 interface Props {
   datasets: Dataset[];
   mappingConfigs: MappingConfig[];
@@ -72,6 +93,15 @@ interface Props {
   dataRun: DataRun | null;
   brandCode: string;
   crosswalkStats: CrosswalkStat[];
+  ingestionRuns: IngestionRun[];
+}
+
+function getRunStatusColor(status: string) {
+  if (status === 'success') return 'bg-emerald-100 text-emerald-800';
+  if (status === 'partial_success') return 'bg-amber-100 text-amber-800';
+  if (status === 'failed') return 'bg-red-100 text-red-800';
+  if (status === 'running') return 'bg-blue-100 text-blue-800';
+  return 'bg-gray-100 text-gray-700';
 }
 
 function FreshnessIcon({ freshness }: { freshness: string }) {
@@ -101,6 +131,7 @@ export default function DataMappingClient({
   dataRun,
   brandCode,
   crosswalkStats,
+  ingestionRuns,
 }: Props) {
   const [activeTab, setActiveTab] = useState('status');
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -280,6 +311,54 @@ export default function DataMappingClient({
               </table>
             </div>
           </motion.div>
+
+          {/* Recent Ingestion Runs */}
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Ingestion Runs</h3>
+            {ingestionRuns.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">
+                No ingestion runs yet — use <code className="font-mono text-xs bg-gray-100 px-1 rounded">POST /api/ingest/facts</code> to push data.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Source / Feed</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Started</th>
+                      <th className="px-4 py-2 text-right">Loaded</th>
+                      <th className="px-4 py-2 text-right">Rejected</th>
+                      <th className="px-4 py-2 text-left">File</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {ingestionRuns.map((run) => (
+                      <tr key={run.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {run.sourceSystem}
+                          <span className="block text-xs text-gray-400 font-normal">{run.sourceFeedName}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getRunStatusColor(run.status)}`}>
+                            {run.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">
+                          {new Date(run.startedAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900">{run.recordsLoaded ?? '—'}</td>
+                        <td className="px-4 py-3 text-right text-gray-500">{run.recordsRejected ?? '—'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 truncate max-w-[180px]">
+                          {run.fileManifests[0]?.sourceFileName ?? '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           <div className="rounded-xl p-4 mt-4 border border-[#0284C7]/15 bg-gradient-to-r from-[#EFF6FF] to-[#E0F2FE]">
             <div className="flex items-start gap-3">

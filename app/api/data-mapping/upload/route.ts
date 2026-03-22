@@ -5,9 +5,8 @@ import { Brand } from '@prisma/client';
 import { getOrgId, assertBrandAccess, getUserId } from '@/lib/request-context';
 
 interface RuleInput {
-  hubValue: string;
-  normalizedValue: string;
-  category: string;
+  sourceField: string;
+  targetField: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -39,28 +38,28 @@ export async function POST(request: NextRequest) {
 
     let imported = 0;
 
-    // Upsert each rule by (brandId, ruleType, hubValue)
+    // Upsert each field mapping rule by (brandId, ruleType, hubValue)
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i];
-      if (!rule.hubValue || !rule.normalizedValue || !rule.category) continue;
+      if (!rule.sourceField || !rule.targetField) continue;
 
       const existing = await prisma.normalizationRule.findFirst({
-        where: { brandId: brand.id, ruleType: 'sp_status', hubValue: rule.hubValue },
+        where: { brandId: brand.id, ruleType: 'field_mapping', hubValue: rule.sourceField },
       });
 
       if (existing) {
         await prisma.normalizationRule.update({
           where: { id: existing.id },
-          data: { normalizedValue: rule.normalizedValue, category: rule.category, sortOrder: i },
+          data: { normalizedValue: rule.targetField, category: dataset, sortOrder: i },
         });
       } else {
         await prisma.normalizationRule.create({
           data: {
             brandId: brand.id,
-            ruleType: 'sp_status',
-            hubValue: rule.hubValue,
-            normalizedValue: rule.normalizedValue,
-            category: rule.category,
+            ruleType: 'field_mapping',
+            hubValue: rule.sourceField,
+            normalizedValue: rule.targetField,
+            category: dataset,
             sortOrder: i,
           },
         });
