@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Upload, Play, CheckCircle2, AlertTriangle, Clock, Info, Plus, History, ArrowUpDown } from 'lucide-react';
+import { Upload, CheckCircle2, AlertTriangle, Clock, Info, Plus, History, ArrowUpDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +55,36 @@ interface DataRun {
   runAt: string;
 }
 
+interface CrosswalkStat {
+  id: string;
+  statType: string;
+  label: string;
+  matchRate: number;
+  unmatchedCount: number;
+  entityType: string;
+}
+
+interface FileManifest {
+  id: string;
+  sourceFileName: string | null;
+  rowCountLoaded: number | null;
+  rowCountRejected: number | null;
+  status: string | null;
+}
+
+interface IngestionRun {
+  id: string;
+  sourceSystem: string;
+  sourceFeedName: string;
+  status: string;
+  startedAt: string;
+  endedAt: string | null;
+  recordsLoaded: number | null;
+  recordsRejected: number | null;
+  triggerType: string | null;
+  fileManifests: FileManifest[];
+}
+
 interface Props {
   datasets: Dataset[];
   mappingConfigs: MappingConfig[];
@@ -62,6 +92,16 @@ interface Props {
   publishedMappings: PublishedMapping[];
   dataRun: DataRun | null;
   brandCode: string;
+  crosswalkStats: CrosswalkStat[];
+  ingestionRuns: IngestionRun[];
+}
+
+function getRunStatusColor(status: string) {
+  if (status === 'success') return 'bg-emerald-100 text-emerald-800';
+  if (status === 'partial_success') return 'bg-amber-100 text-amber-800';
+  if (status === 'failed') return 'bg-red-100 text-red-800';
+  if (status === 'running') return 'bg-blue-100 text-blue-800';
+  return 'bg-gray-100 text-gray-700';
 }
 
 function FreshnessIcon({ freshness }: { freshness: string }) {
@@ -90,12 +130,18 @@ export default function DataMappingClient({
   publishedMappings,
   dataRun,
   brandCode,
+  crosswalkStats,
+  ingestionRuns,
 }: Props) {
   const [activeTab, setActiveTab] = useState('status');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<MappingConfig | null>(null);
   const [editStatus, setEditStatus] = useState('');
   const [configs, setConfigs] = useState<MappingConfig[]>(mappingConfigs);
+  const [editingRule, setEditingRule] = useState<NormalizationRule | null>(null);
+  const [editNormalizedValue, setEditNormalizedValue] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [rules, setRules] = useState<NormalizationRule[]>(normalizationRules);
 
   const formatLastRun = (date: Date | string) =>
     new Date(date).toLocaleString('en-US', {
@@ -134,6 +180,43 @@ export default function DataMappingClient({
     setEditingConfig(null);
   };
 
+  const openEditRule = (rule: NormalizationRule) => {
+    setEditingRule(rule);
+    setEditNormalizedValue(rule.normalizedValue);
+    setEditCategory(rule.category);
+  };
+
+  const saveEditRule = async () => {
+    if (!editingRule) return;
+    try {
+      const res = await fetch('/api/data-mapping/rules', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingRule.id,
+          normalizedValue: editNormalizedValue,
+          category: editCategory,
+          brandCode,
+        }),
+      });
+      if (res.ok) {
+        const { rule } = await res.json();
+        setRules((prev) =>
+          prev.map((r) =>
+            r.id === rule.id
+              ? { ...r, normalizedValue: rule.normalizedValue, category: rule.category }
+              : r
+          )
+        );
+      } else {
+        toast.error('Failed to update normalization rule');
+      }
+    } catch {
+      toast.error('Failed to update normalization rule');
+    }
+    setEditingRule(null);
+  };
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -160,10 +243,6 @@ export default function DataMappingClient({
           >
             <Upload className="w-4 h-4" />
             Upload Mapping
-          </Button>
-          <Button variant="outline" className="gap-2">
-            <Play className="w-4 h-4" />
-            Test on Sample
           </Button>
         </div>
       </motion.div>
@@ -232,6 +311,54 @@ export default function DataMappingClient({
               </table>
             </div>
           </motion.div>
+
+          {/* Recent Ingestion Runs */}
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Ingestion Runs</h3>
+            {ingestionRuns.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">
+                No ingestion runs yet — use <code className="font-mono text-xs bg-gray-100 px-1 rounded">POST /api/ingest/facts</code> to push data.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Source / Feed</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Started</th>
+                      <th className="px-4 py-2 text-right">Loaded</th>
+                      <th className="px-4 py-2 text-right">Rejected</th>
+                      <th className="px-4 py-2 text-left">File</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {ingestionRuns.map((run) => (
+                      <tr key={run.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {run.sourceSystem}
+                          <span className="block text-xs text-gray-400 font-normal">{run.sourceFeedName}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getRunStatusColor(run.status)}`}>
+                            {run.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">
+                          {new Date(run.startedAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900">{run.recordsLoaded ?? '—'}</td>
+                        <td className="px-4 py-3 text-right text-gray-500">{run.recordsRejected ?? '—'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 truncate max-w-[180px]">
+                          {run.fileManifests[0]?.sourceFileName ?? '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           <div className="rounded-xl p-4 mt-4 border border-[#0284C7]/15 bg-gradient-to-r from-[#EFF6FF] to-[#E0F2FE]">
             <div className="flex items-start gap-3">
@@ -381,7 +508,7 @@ export default function DataMappingClient({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F1F5F9]">
-                    {normalizationRules.map((rule) => (
+                    {rules.map((rule) => (
                       <tr key={rule.id} className="hover:bg-[#F8FAFC] transition-colors">
                         <td className="px-4 py-3 text-sm text-[#334155]">{rule.hubValue}</td>
                         <td className="px-4 py-3">
@@ -391,7 +518,7 @@ export default function DataMappingClient({
                           <Badge variant="secondary" className="rounded-full text-[11px]">{rule.category}</Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Button variant="ghost" size="sm">Edit</Button>
+                          <Button variant="ghost" size="sm" onClick={() => openEditRule(rule)}>Edit</Button>
                         </td>
                       </tr>
                     ))}
@@ -403,34 +530,59 @@ export default function DataMappingClient({
             <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
               <h3 className="font-semibold text-[#0F172A] mb-4">ID Crosswalk Status</h3>
               <div className="grid grid-cols-3 gap-4 mb-4">
-                {[
-                  { label: 'NPI Coverage', value: 94.2, color: '#16A34A' },
-                  { label: 'Account ID Match Rate', value: 97.8, color: '#16A34A' },
-                  { label: 'Territory Alignment', value: 100, color: '#16A34A' },
-                ].map((item) => (
-                  <div key={item.label} className="border border-[#F1F5F9] rounded-xl p-4 bg-[#FAFBFC]">
-                    <div className="text-[11px] text-[#94A3B8] font-semibold uppercase tracking-wider mb-2">{item.label}</div>
-                    <div className="text-2xl font-semibold text-[#0F172A] mb-2" style={{ fontVariantNumeric: 'tabular-nums' }}>{item.value}%</div>
-                    <div className="h-2 bg-[#F1F5F9] rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${item.value}%` }}
-                        transition={{ duration: 0.8 }}
-                        style={{ backgroundColor: item.color }}
-                      />
+                {crosswalkStats.map((stat) => {
+                  const color = stat.matchRate >= 95 ? '#16A34A' : stat.matchRate >= 85 ? '#D97706' : '#DC2626';
+                  return (
+                    <div key={stat.statType} className="border border-[#F1F5F9] rounded-xl p-4 bg-[#FAFBFC]">
+                      <div className="text-[11px] text-[#94A3B8] font-semibold uppercase tracking-wider mb-2">{stat.label}</div>
+                      <div className="text-2xl font-semibold text-[#0F172A] mb-2" style={{ fontVariantNumeric: 'tabular-nums' }}>{stat.matchRate}%</div>
+                      <div className="h-2 bg-[#F1F5F9] rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${stat.matchRate}%` }}
+                          transition={{ duration: 0.8 }}
+                          style={{ backgroundColor: color }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <Accordion type="single" collapsible>
                 <AccordionItem value="unmatched">
                   <AccordionTrigger className="text-sm">
-                    View Unmatched Records (23 HCPs, 14 Accounts)
+                    {(() => {
+                      const parts = crosswalkStats
+                        .filter(s => s.unmatchedCount > 0 && s.entityType)
+                        .map(s => `${s.unmatchedCount} ${s.entityType}s`);
+                      return parts.length > 0
+                        ? `View Unmatched Records (${parts.join(', ')})`
+                        : 'View Unmatched Records';
+                    })()}
                   </AccordionTrigger>
                   <AccordionContent>
-                    <div className="bg-[#F8FAFC] rounded-xl p-4 text-sm text-[#64748B] border border-[#F1F5F9]">
-                      Detailed unmatched records and resolution tools would appear here
+                    <div className="bg-[#F8FAFC] rounded-xl p-4 border border-[#F1F5F9]">
+                      {crosswalkStats.filter(s => s.unmatchedCount > 0).length === 0 ? (
+                        <p className="text-sm text-[#64748B]">No unmatched records found.</p>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-[11px] text-[#94A3B8] uppercase tracking-wider">
+                              <th className="text-left pb-2">Dataset</th>
+                              <th className="text-right pb-2">Unmatched</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#F1F5F9]">
+                            {crosswalkStats.filter(s => s.unmatchedCount > 0).map(s => (
+                              <tr key={s.statType}>
+                                <td className="py-2 text-[#334155]">{s.label}</td>
+                                <td className="py-2 text-right font-semibold text-[#DC2626]">{s.unmatchedCount} {s.entityType}s</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -461,6 +613,45 @@ export default function DataMappingClient({
               <Button size="sm" className="rounded-xl" onClick={saveEdit}>
                 Save
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Normalization Rule Modal */}
+      {editingRule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div role="dialog" aria-modal="true" aria-labelledby="edit-rule-title" className="bg-white rounded-2xl border border-[#E2E8F0] p-6 w-96 shadow-xl">
+            <h3 id="edit-rule-title" className="font-semibold text-[#0F172A] mb-1">Edit Normalization Rule</h3>
+            <p className="text-xs text-[#94A3B8] mb-4">Hub value: <span className="font-mono text-[#334155]">{editingRule.hubValue}</span></p>
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] mb-1">Normalized Value</label>
+                <input
+                  type="text"
+                  value={editNormalizedValue}
+                  onChange={(e) => setEditNormalizedValue(e.target.value)}
+                  className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] mb-1">Category</label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
+                >
+                  <option value="Investigation">Investigation</option>
+                  <option value="Access">Access</option>
+                  <option value="Engagement">Engagement</option>
+                  <option value="Fulfillment">Fulfillment</option>
+                  <option value="Closed">Closed</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setEditingRule(null)}>Cancel</Button>
+              <Button size="sm" className="rounded-xl" onClick={saveEditRule}>Save</Button>
             </div>
           </div>
         </div>

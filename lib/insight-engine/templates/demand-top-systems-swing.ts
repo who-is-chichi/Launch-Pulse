@@ -1,5 +1,6 @@
 import type { EngineInput, InsightOutput } from '../types';
 import { deriveConfidence, deriveSeverity, formatPct, formatNum, filterByWeek } from '../utils';
+import { THRESHOLDS } from '../thresholds';
 
 export function run(input: EngineInput): InsightOutput | null {
   const currOrgs = filterByWeek(input.claimsFacts, input.currentWeekEnding).filter(
@@ -20,13 +21,13 @@ export function run(input: EngineInput): InsightOutput | null {
       return { ...r, prior, delta };
     })
     .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
-    .slice(0, 3);
+    .slice(0, THRESHOLDS.demandTopN);
 
-  if (Math.abs(ranked[0].delta) < 5) return null;
+  if (Math.abs(ranked[0].delta) < THRESHOLDS.demandSwingMinDelta) return null;
 
   const totalAbsDelta = ranked.reduce((sum, r) => sum + Math.abs(r.delta), 0);
   const topDirection = ranked[0].delta < 0 ? 'declining' : 'growing';
-  const severity = deriveSeverity(0, Math.abs(ranked[0].delta), 50, 20);
+  const severity = deriveSeverity(0, Math.abs(ranked[0].delta), THRESHOLDS.demandSwingHighImpact, THRESHOLDS.demandSwingMedImpact);
   const confidence = deriveConfidence(input.datasets, ['claims_weekly']);
 
   const contributors = ranked.map((r, i) => ({

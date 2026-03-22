@@ -46,22 +46,33 @@ export default function InsightsClient({
   totalCount,
   page,
   pageSize,
+  pillar,
+  geographyFallback,
+  geography,
 }: {
   initialInsights: Insight[];
   totalCount: number;
   page: number;
   pageSize: number;
+  pillar: string;
+  geographyFallback: boolean;
+  geography: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [selectedPillar, setSelectedPillar] = useState('all');
+  const pathname = '/insights';
   const [selectedSeverity, setSelectedSeverity] = useState('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const { geography, searchQuery, brand, timeWindow } = useFilters();
+  const { searchQuery, brand, timeWindow } = useFilters();
   const [isRunning, setIsRunning] = useState(false);
   const totalPages = Math.ceil(totalCount / pageSize);
 
   useEffect(() => {
+    const current = new URLSearchParams(searchParams.toString());
+    const currentBrand = current.get('brand') ?? 'ONC-101';
+    const currentTW = current.get('timeWindow') ?? 'Last 7 days';
+    // Only navigate if filter state actually changed from what's in URL
+    if (currentBrand === brand && currentTW === timeWindow) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set('brand', brand);
     params.set('timeWindow', timeWindow);
@@ -70,16 +81,14 @@ export default function InsightsClient({
   }, [brand, timeWindow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredInsights = initialInsights.filter((insight) => {
-    const matchesPillar = selectedPillar === 'all' || insight.pillar.toLowerCase() === selectedPillar;
     const matchesSeverity = selectedSeverity === 'all' || insight.severity.toLowerCase() === selectedSeverity;
-    const matchesGeo = geography === 'Nation' || insight.region === geography;
     const matchesSearch =
       !searchQuery ||
       insight.headline.toLowerCase().includes(searchQuery.toLowerCase()) ||
       insight.pillar.toLowerCase().includes(searchQuery.toLowerCase()) ||
       insight.region.toLowerCase().includes(searchQuery.toLowerCase()) ||
       insight.impact.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesPillar && matchesSeverity && matchesGeo && matchesSearch;
+    return matchesSeverity && matchesSearch;
   });
 
   const formatDate = (date: Date | string) =>
@@ -100,6 +109,11 @@ export default function InsightsClient({
 
   return (
     <div className="space-y-6">
+      {geographyFallback && (
+        <div className="mb-4 px-4 py-2.5 rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] text-sm text-[#1D4ED8] flex items-center gap-2">
+          <span className="font-medium">Note:</span> No data available for {geography} — showing Nation-level data.
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -168,16 +182,24 @@ export default function InsightsClient({
           <span className="text-sm font-medium text-[#334155]">Filters:</span>
         </div>
 
-        <Select value={selectedPillar} onValueChange={setSelectedPillar}>
+        <Select
+          value={pillar || 'all'}
+          onValueChange={(value) => {
+            const params = new URLSearchParams(searchParams.toString());
+            if (value && value !== 'all') params.set('pillar', value); else params.delete('pillar');
+            params.set('page', '1');
+            router.push(`${pathname}?${params.toString()}`);
+          }}
+        >
           <SelectTrigger className="w-40 rounded-xl">
             <SelectValue placeholder="All Pillars" />
           </SelectTrigger>
           <SelectContent position="popper" sideOffset={4}>
             <SelectItem value="all">All Pillars</SelectItem>
-            <SelectItem value="demand">Demand</SelectItem>
-            <SelectItem value="start ops">Start Ops</SelectItem>
-            <SelectItem value="execution">Execution</SelectItem>
-            <SelectItem value="structure">Structure</SelectItem>
+            <SelectItem value="Demand">Demand</SelectItem>
+            <SelectItem value="Start Ops">Start Ops</SelectItem>
+            <SelectItem value="Execution">Execution</SelectItem>
+            <SelectItem value="Structure">Structure</SelectItem>
           </SelectContent>
         </Select>
 
@@ -196,7 +218,13 @@ export default function InsightsClient({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { setSelectedPillar('all'); setSelectedSeverity('all'); }}
+          onClick={() => {
+            setSelectedSeverity('all');
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete('pillar');
+            params.set('page', '1');
+            router.push(`${pathname}?${params.toString()}`);
+          }}
           className="text-[#94A3B8] hover:text-[#334155]"
         >
           Clear Filters

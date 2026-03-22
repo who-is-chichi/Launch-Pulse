@@ -22,7 +22,6 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  Zap,
   Columns3,
   Rows3,
   Hash,
@@ -104,14 +103,48 @@ const mockFieldMappings: FieldMapping[] = [
   { sourceField: 'REP_NAME', sampleValues: ['Sarah Chen', 'Mike Torres'], suggestedField: 'rep_full_name', confidence: 60, transformation: 'none', status: 'warning', required: 'optional' },
 ];
 
-const platformFields = [
-  'hcp_npi', 'hcp_full_name', 'hcp_first_name', 'hcp_last_name', 'hcp_specialty',
-  'period_end_date', 'period_start_date', 'product_name', 'product_ndc',
-  'new_rx_count', 'total_rx_count', 'refill_rx_count',
-  'payer_channel', 'plan_name', 'state_code', 'zip_code',
-  'territory_id', 'region_id', 'rep_full_name', 'rep_id',
-  'account_id', 'parent_org_id', 'data_source',
-];
+const BRONZE_TARGET_FIELDS: Record<string, string[]> = {
+  Claims: [
+    'claimId', 'claimLineId', 'patientToken', 'patientAgeBand', 'patientGender',
+    'payerChannel', 'payerNameRaw', 'planNameRaw', 'planIdRaw', 'pbmNameRaw',
+    'drugNameRaw', 'brandNameRaw', 'ndc11', 'trxNrxFlag', 'rxFillNumber',
+    'quantity', 'daysSupply', 'writtenDate', 'fillDate', 'serviceDate',
+    'prescriberNpiRaw', 'prescriberIdRaw', 'hcpNameRaw', 'hcoIdRaw', 'hcoNameRaw',
+    'specialtyRaw', 'zip3', 'zip5', 'stateCode', 'territoryCodeRaw',
+    'claimStatusRaw', 'rejectionCodeRaw', 'rejectionReasonRaw',
+    'paidAmountRaw', 'copayAmountRaw', 'sourceLastUpdatedTs',
+  ],
+  Dispense: [
+    'dispenseId', 'spCaseId', 'patientToken', 'prescriberNpiRaw', 'ndc11',
+    'brandNameRaw', 'dispenseDate', 'shipDate', 'fillNumber', 'quantity',
+    'daysSupply', 'dispensingPharmacyIdRaw', 'dispensingPharmacyNameRaw',
+    'dispenseStatusRaw', 'dispenseChannelRaw', 'sourceLastUpdatedTs',
+  ],
+  'SP Cases': [
+    'spCaseId', 'referralId', 'patientToken', 'prescriberNpiRaw', 'prescriberIdRaw',
+    'hcpNameRaw', 'hcoIdRaw', 'hcoNameRaw', 'brandNameRaw', 'drugNameRaw',
+    'caseStatusRaw', 'caseSubstatusRaw', 'casePriorityRaw', 'referralDate',
+    'intakeDate', 'bvStartDate', 'bvCompleteDate', 'paStartDate', 'paOutcomeDate',
+    'patientOutreachDate', 'approvalDate', 'firstDispenseDateRaw', 'shipmentDateRaw',
+    'sourceLastUpdatedTs',
+  ],
+  Calls: [
+    'callId', 'interactionIdRaw', 'repIdRaw', 'repEmailRaw', 'repNameRaw',
+    'managerIdRaw', 'territoryCodeRaw', 'territoryNameRaw', 'prescriberNpiRaw',
+    'hcpIdRaw', 'hcoIdRaw', 'callDate', 'callTs', 'callTypeRaw', 'channelRaw',
+    'callStatusRaw', 'callPlanFlagRaw', 'callDurationMinutesRaw',
+    'productDiscussedRaw', 'detailPriorityRaw', 'sampleFlagRaw',
+    'speakerProgramFlagRaw', 'sourceLastUpdatedTs',
+  ],
+  Structure: [
+    'alignmentRecordId', 'entityIdRaw', 'entityTypeRaw', 'territoryCodeRaw',
+    'territoryNameRaw', 'regionCodeRaw', 'regionNameRaw', 'districtCodeRaw',
+    'districtNameRaw', 'repIdRaw', 'repNameRaw', 'managerIdRaw',
+    'alignmentStartDate', 'alignmentEndDate', 'activeFlagRaw', 'primaryFlagRaw',
+    'repSourceId', 'employeeIdRaw', 'repEmailRaw', 'roleRaw', 'teamRaw',
+    'employmentStatusRaw', 'hireDateRaw', 'terminationDateRaw', 'sourceLastUpdatedTs',
+  ],
+};
 
 const transformations = [
   { value: 'none', label: 'None' },
@@ -247,8 +280,6 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
   const [isParsing, setIsParsing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>(mockFieldMappings);
-  const [isTesting, setIsTesting] = useState(false);
-  const [testComplete, setTestComplete] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishComplete, setPublishComplete] = useState(false);
   const [mappingName, setMappingName] = useState('');
@@ -262,8 +293,6 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
     setUploadedFile(null);
     setIsParsing(false);
     setFieldMappings(mockFieldMappings);
-    setIsTesting(false);
-    setTestComplete(false);
     setIsPublishing(false);
     setPublishComplete(false);
     setMappingName('');
@@ -275,30 +304,24 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
     onClose();
   };
 
-  const simulateUpload = () => {
+  const handleFileSelect = (file: File) => {
     setIsParsing(true);
+    // Brief parse delay to show loading state, then record real file metadata
     setTimeout(() => {
-      setUploadedFile({
-        name: 'claims_weekly_2026W09.csv',
-        size: '2.4 MB',
-        time: 'Mar 10, 2026 09:14 AM',
-      });
+      const sizeKB = file.size / 1024;
+      const sizeMB = sizeKB / 1024;
+      const sizeStr = sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${Math.round(sizeKB)} KB`;
+      const uploadTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      setUploadedFile({ name: file.name, size: sizeStr, time: uploadTime });
       setIsParsing(false);
-    }, 1500);
+    }, 800);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    simulateUpload();
-  };
-
-  const handleTest = () => {
-    setIsTesting(true);
-    setTimeout(() => {
-      setIsTesting(false);
-      setTestComplete(true);
-    }, 2000);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
   };
 
   const handlePublish = async () => {
@@ -313,7 +336,9 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
           brandCode: brand,
           dataset: ds?.name ?? '',
           name,
-          rules: [],
+          rules: fieldMappings
+            .filter(m => m.sourceField && m.suggestedField)
+            .map(m => ({ sourceField: m.sourceField, targetField: m.suggestedField })),
         }),
       });
     } catch {
@@ -506,7 +531,16 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
                       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                       onDragLeave={() => setIsDragOver(false)}
                       onDrop={handleDrop}
-                      onClick={simulateUpload}
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.csv,.xlsx,.json,.yaml,.yml';
+                        input.onchange = (ev) => {
+                          const file = (ev.target as HTMLInputElement).files?.[0];
+                          if (file) handleFileSelect(file);
+                        };
+                        input.click();
+                      }}
                     >
                       <motion.div
                         animate={isDragOver ? { scale: 1.05 } : { scale: 1 }}
@@ -772,7 +806,7 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
                                     }}
                                     className="w-full bg-white border border-[#E2E8F0] rounded-lg px-2 py-1.5 text-[11px] text-[#0F172A] focus:border-[#1D4ED8] focus:ring-1 focus:ring-[#1D4ED8]/20 outline-none"
                                   >
-                                    {platformFields.map((pf) => (
+                                    {(BRONZE_TARGET_FIELDS[datasetOptions.find(d => d.id === selectedDataset)?.name ?? ''] ?? []).map((pf) => (
                                       <option key={pf} value={pf}>{pf}</option>
                                     ))}
                                   </select>
@@ -875,72 +909,12 @@ export default function UploadMappingWizard({ open, onClose, brand }: UploadMapp
                         ))}
                       </div>
 
-                      <div className="border border-[#E2E8F0] rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-[#D97706]" />
-                            <span className="text-[13px] font-semibold text-[#0F172A]">Sample Transformation Test</span>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleTest}
-                            disabled={isTesting}
-                            className="gap-1.5 rounded-xl text-[11px]"
-                          >
-                            {isTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                            {isTesting ? 'Testing...' : 'Test on Sample'}
-                          </Button>
-                        </div>
-
-                        {isTesting && (
-                          <div className="text-center py-6">
-                            <RefreshCw className="w-6 h-6 text-[#1D4ED8] mx-auto mb-2 animate-spin" />
-                            <p className="text-[12px] text-[#64748B]">Running transformation on sample rows...</p>
-                            <Progress value={45} className="max-w-xs mx-auto mt-3" />
-                          </div>
-                        )}
-
-                        {testComplete && !isTesting && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="space-y-3"
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <CheckCircle2 className="w-4 h-4 text-[#16A34A]" />
-                              <span className="text-[12px] font-semibold text-[#166534]">Sample test completed successfully</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-1.5 block">Raw Source</span>
-                                <div className="bg-[#F8FAFC] rounded-lg p-3 border border-[#F1F5F9] font-mono text-[10px] text-[#334155] space-y-1">
-                                  <div><span className="text-[#94A3B8]">NPI:</span> 1234567890</div>
-                                  <div><span className="text-[#94A3B8]">HCP_NAME:</span> Smith, John MD</div>
-                                  <div><span className="text-[#94A3B8]">WEEK_ENDING:</span> 2026-03-01</div>
-                                  <div><span className="text-[#94A3B8]">NRX:</span> 12</div>
-                                  <div><span className="text-[#94A3B8]">PLAN_TYPE:</span> Commercial</div>
-                                </div>
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-1.5 block">Transformed Output</span>
-                                <div className="bg-[#F0FDF4]/50 rounded-lg p-3 border border-[#BBF7D0] font-mono text-[10px] text-[#334155] space-y-1">
-                                  <div><span className="text-[#16A34A]">hcp_npi:</span> 1234567890</div>
-                                  <div><span className="text-[#16A34A]">hcp_full_name:</span> Smith, John MD</div>
-                                  <div><span className="text-[#16A34A]">period_end_date:</span> 2026-03-01</div>
-                                  <div><span className="text-[#16A34A]">new_rx_count:</span> 12</div>
-                                  <div><span className="text-[#16A34A]">payer_channel:</span> COMMERCIAL</div>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {!isTesting && !testComplete && (
-                          <p className="text-[12px] text-[#94A3B8] text-center py-4">
-                            Run a test to preview how source data transforms through your mapping configuration.
-                          </p>
-                        )}
+                      <div className="rounded-lg border border-blue-100 bg-blue-50 p-6 text-center">
+                        <p className="text-sm font-medium text-blue-800 mb-1">Mapping Configured</p>
+                        <p className="text-xs text-blue-600">
+                          Proceed to Publish to save this mapping. To validate against live data,
+                          call <code className="font-mono bg-white px-1 rounded text-blue-700">POST /api/ingest/facts</code> after publishing.
+                        </p>
                       </div>
 
                       <div className="border border-[#E2E8F0] rounded-xl p-4 space-y-4">

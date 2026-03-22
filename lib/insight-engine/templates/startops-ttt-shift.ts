@@ -1,5 +1,6 @@
 import type { EngineInput, InsightOutput } from '../types';
 import { deriveConfidence, deriveSeverity, formatPct, findByDate } from '../utils';
+import { THRESHOLDS } from '../thresholds';
 
 export function run(input: EngineInput): InsightOutput | null {
   const curr = findByDate(input.spFacts, input.currentWeekEnding);
@@ -8,11 +9,11 @@ export function run(input: EngineInput): InsightOutput | null {
   if (!curr || !prior) return null;
 
   const dayChange = curr.tttMedianDays - prior.tttMedianDays;
-  if (Math.abs(dayChange) < 1) return null;
+  if (Math.abs(dayChange) < THRESHOLDS.tttMinDayChange) return null;
 
   const direction = dayChange > 0 ? 'up' : 'down';
   const absPct = prior.tttMedianDays > 0 ? Math.abs(dayChange / prior.tttMedianDays) * 100 : 0;
-  const severity = deriveSeverity(absPct, 0, 15, 8);
+  const severity = deriveSeverity(absPct, 0, THRESHOLDS.tttHighImpact, THRESHOLDS.tttMedImpact);
   const confidence = deriveConfidence(input.datasets, ['sp_cases', 'claims_weekly']);
 
   const verb = direction === 'up' ? 'increased' : 'decreased';

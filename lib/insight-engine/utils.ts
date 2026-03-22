@@ -1,4 +1,5 @@
 import type { Dataset } from '@prisma/client';
+import { THRESHOLDS } from './thresholds';
 
 export function deriveConfidence(
   datasets: Dataset[],
@@ -16,8 +17,8 @@ export function deriveSeverity(
   highThreshold: number,
   mediumThreshold: number,
 ): 'High' | 'Medium' | 'Low' {
-  if (changePct >= 15 || absoluteImpact >= highThreshold) return 'High';
-  if (changePct >= 8 || absoluteImpact >= mediumThreshold) return 'Medium';
+  if (changePct >= THRESHOLDS.severityHighChangePct || absoluteImpact >= highThreshold) return 'High';
+  if (changePct >= THRESHOLDS.severityMedChangePct || absoluteImpact >= mediumThreshold) return 'Medium';
   return 'Low';
 }
 
