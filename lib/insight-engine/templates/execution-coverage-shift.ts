@@ -1,5 +1,6 @@
 import type { EngineInput, InsightOutput } from '../types';
 import { deriveConfidence, deriveSeverity, formatPct, formatNum, filterByWeek } from '../utils';
+import { THRESHOLDS } from '../thresholds';
 
 export function run(input: EngineInput): InsightOutput | null {
   const currRows = filterByWeek(input.callsFacts, input.currentWeekEnding);
@@ -16,7 +17,7 @@ export function run(input: EngineInput): InsightOutput | null {
       const drop = priorPct - r.compliancePct;
       return { ...r, priorPct, drop };
     })
-    .filter(r => r.drop >= 5)
+    .filter(r => r.drop >= THRESHOLDS.coverageMinDropPct)
     .sort((a, b) => a.compliancePct - b.compliancePct); // worst compliance first
 
   if (dropped.length === 0) return null;
@@ -25,9 +26,9 @@ export function run(input: EngineInput): InsightOutput | null {
   const avgCompliance = Math.round(
     currRows.reduce((sum, r) => sum + r.compliancePct, 0) / currRows.length,
   );
-  const belowThreshold = currRows.filter(r => r.compliancePct < 60).length;
+  const belowThreshold = currRows.filter(r => r.compliancePct < THRESHOLDS.coverageComplianceBaseline).length;
 
-  const severity = deriveSeverity(worst.drop, 0, 15, 5);
+  const severity = deriveSeverity(worst.drop, 0, THRESHOLDS.coverageHighImpact, THRESHOLDS.coverageMedImpact);
   const confidence = deriveConfidence(input.datasets, ['territory_alignment']);
 
   const metricChanges = dropped.map(r => ({
@@ -41,7 +42,7 @@ export function run(input: EngineInput): InsightOutput | null {
     direction: 'down' as const,
   }));
 
-  const belowStr = belowThreshold > 0 ? `; ${belowThreshold} reps below 60% threshold` : '';
+  const belowStr = belowThreshold > 0 ? `; ${belowThreshold} reps below ${THRESHOLDS.coverageComplianceBaseline}% threshold` : '';
   const headline = `${worst.territory} call plan compliance at ${Math.round(worst.compliancePct)}%${belowStr}`;
 
   return {

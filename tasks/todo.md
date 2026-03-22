@@ -5,6 +5,56 @@
 
 ---
 
+# Sprint 14 — Logout Logger + Engine Threshold Centralization (2026-03-22)
+
+## Status: COMPLETE
+
+## Context
+Two CLAUDE.md compliance gaps:
+1. `app/api/auth/logout/route.ts` — missing lib/logger.ts (all API routes must log)
+2. Engine thresholds scattered as magic numbers across 7 files — centralize into `lib/insight-engine/thresholds.ts`
+
+## Tasks
+
+### Pre-work
+- [x] Write tasks/todo.md
+
+### Agent 1 — Logout logger
+- [x] Add `import { logger } from '@/lib/logger'` to `app/api/auth/logout/route.ts`
+- [x] Add `logger.info('User logged out', { route: 'POST /api/auth/logout' })` before return
+- [x] Run `npx tsc --noEmit`
+
+### Agent 2 — Create thresholds.ts
+- [x] Write `lib/insight-engine/thresholds.ts` with `THRESHOLDS` const object
+- [x] Run `npx tsc --noEmit`
+
+### Agent 3 — Wire THRESHOLDS into engine files (after Agent 2)
+- [x] Update `lib/insight-engine/utils.ts` (15, 8 → THRESHOLDS)
+- [x] Update all 6 templates to import + use THRESHOLDS
+- [x] Run `npx tsc --noEmit`
+
+### Agent 4 — Targeted tests (after Agent 2, parallel with Agent 3)
+- [x] Write `__tests__/thresholds.test.ts` (config shape + ordering invariants)
+- [x] Write `__tests__/engine-thresholds-integration.test.ts` (template boundary tests)
+- [x] Write `scripts/sprint14-check.ts` (grep-based smoke checks)
+- [x] Run `npx vitest run __tests__/thresholds.test.ts __tests__/engine-thresholds-integration.test.ts`
+
+### Agent 5 — Staff Engineer Review
+- [x] Verify logout logs, no inline literals remain, tests import THRESHOLDS not hardcoded values
+
+### Agent 6 — QA
+- [x] `npx tsc --noEmit` — 0 errors ✅
+- [x] `npx vitest run` — 64/64 (20 new tests) ✅
+- [x] `npx tsx scripts/qa-check.ts` — 114/114 ✅
+- [x] `npx tsx scripts/regression-check.ts` — 16/16 ✅
+- [x] `npx tsx scripts/sprint14-check.ts` — 15/15 ✅
+
+### Completion
+- [x] Create `notes/2026-03-22-sprint14-logout-thresholds.md`
+- [ ] Commit
+
+---
+
 # Sprint 13 — Data Mapping Fixes (2026-03-22)
 
 ## Status: COMPLETE

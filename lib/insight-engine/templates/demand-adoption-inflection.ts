@@ -1,5 +1,6 @@
 import type { EngineInput, InsightOutput } from '../types';
 import { deriveConfidence, deriveSeverity, formatPct, formatNum, filterByWeek } from '../utils';
+import { THRESHOLDS } from '../thresholds';
 
 export function run(input: EngineInput): InsightOutput | null {
   const currRows = filterByWeek(input.claimsFacts, input.currentWeekEnding);
@@ -18,7 +19,7 @@ export function run(input: EngineInput): InsightOutput | null {
       const pct = Math.abs(delta / prior);
       return { ...r, prior, delta, pct };
     })
-    .filter((r): r is NonNullable<typeof r> => r !== null && r.pct >= 0.10)
+    .filter((r): r is NonNullable<typeof r> => r !== null && r.pct >= THRESHOLDS.demandMinChangePct / 100)
     .sort((a, b) => {
       if (a.dimensionType === 'nation' && b.dimensionType !== 'nation') return -1;
       if (b.dimensionType === 'nation' && a.dimensionType !== 'nation') return 1;
@@ -34,7 +35,7 @@ export function run(input: EngineInput): InsightOutput | null {
   const direction = top.delta < 0 ? 'down' : 'up';
   const region = top.dimensionType === 'nation' ? 'Nation' : top.dimension;
 
-  const severity = deriveSeverity(absPct, absDelta, 50, 20);
+  const severity = deriveSeverity(absPct, absDelta, THRESHOLDS.demandHighImpact, THRESHOLDS.demandMedImpact);
   const confidence = deriveConfidence(input.datasets, ['claims_weekly']);
 
   const risks = [];

@@ -1,5 +1,6 @@
 import type { EngineInput, InsightOutput } from '../types';
 import { deriveConfidence, deriveSeverity } from '../utils';
+import { THRESHOLDS } from '../thresholds';
 
 export function run(input: EngineInput): InsightOutput | null {
   const wins = input.structureEvents.filter(e => e.eventType === 'formulary_win');
@@ -14,7 +15,7 @@ export function run(input: EngineInput): InsightOutput | null {
   const primaryRegion = wins[0]?.region ?? losses[0]?.region ?? 'Nation';
 
   const isWin = wins.length > 0;
-  const livesK = Math.round(totalWinLives / 1000);
+  const livesK = Math.round(totalWinLives / THRESHOLDS.formularyLivesUnit);
   const headline = isWin
     ? `Formulary win in ${wins.length} regional payer${wins.length > 1 ? 's' : ''} covering ~${livesK}K covered lives in ${primaryRegion}`
     : `Formulary loss in ${losses.length} regional payer${losses.length > 1 ? 's' : ''} in ${primaryRegion}`;
@@ -50,9 +51,9 @@ export function run(input: EngineInput): InsightOutput | null {
   }
 
   // Losses are high-impact; wins are informational (Low)
-  const lossLivesK = totalLossLives / 1000;
+  const lossLivesK = totalLossLives / THRESHOLDS.formularyLivesUnit;
   const severity = losses.length > 0
-    ? deriveSeverity(losses.length * 10, lossLivesK, 50, 20)
+    ? deriveSeverity(losses.length * 10, lossLivesK, THRESHOLDS.formularyHighImpact, THRESHOLDS.formularyMedImpact)
     : 'Low';
 
   return {

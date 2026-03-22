@@ -1,5 +1,6 @@
 import type { EngineInput, InsightOutput } from '../types';
 import { deriveConfidence } from '../utils';
+import { THRESHOLDS } from '../thresholds';
 
 export function run(input: EngineInput): InsightOutput | null {
   const vacancies    = input.territoryChanges.filter(e => e.changeType === 'vacancy');
@@ -21,7 +22,7 @@ export function run(input: EngineInput): InsightOutput | null {
 
   // Severity based on total affected reps
   const severity: 'High' | 'Medium' | 'Low' =
-    totalAffected >= 5 ? 'High' : totalAffected >= 2 ? 'Medium' : 'Low';
+    totalAffected >= THRESHOLDS.territoryHighReps ? 'High' : totalAffected >= THRESHOLDS.territoryMedReps ? 'Medium' : 'Low';
 
   const metricChanges = [];
   if (vacancies.length > 0) {

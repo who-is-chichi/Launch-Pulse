@@ -1,5 +1,6 @@
 import type { EngineInput, InsightOutput } from '../types';
 import { deriveConfidence, deriveSeverity, formatPct, formatNum, findByDate } from '../utils';
+import { THRESHOLDS } from '../thresholds';
 
 export function run(input: EngineInput): InsightOutput | null {
   const curr = findByDate(input.spFacts, input.currentWeekEnding);
@@ -14,8 +15,8 @@ export function run(input: EngineInput): InsightOutput | null {
     ? curr.resolutionTimeMedian - prior.resolutionTimeMedian
     : 0;
 
-  const fireOnBacklog = backlogPct >= 0.15;
-  const fireOnResolution = resolutionChange >= 2;
+  const fireOnBacklog = backlogPct >= THRESHOLDS.spBacklogPct;
+  const fireOnResolution = resolutionChange >= THRESHOLDS.spResolutionDayChange;
   if (!fireOnBacklog && !fireOnResolution) return null;
 
   const metricChanges = [];
@@ -44,7 +45,7 @@ export function run(input: EngineInput): InsightOutput | null {
   }
 
   const absBacklogCases = prior ? Math.abs(curr.pendingOutreachCount - prior.pendingOutreachCount) : 0;
-  const severity = deriveSeverity(backlogPct * 100, absBacklogCases, 100, 50);
+  const severity = deriveSeverity(backlogPct * 100, absBacklogCases, THRESHOLDS.spHighImpact, THRESHOLDS.spMedImpact);
   const confidence = deriveConfidence(input.datasets, ['sp_cases']);
 
   const parts: string[] = [];
