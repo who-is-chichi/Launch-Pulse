@@ -9,9 +9,13 @@ const PAGE_SIZE = 10;
 export default async function InsightsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; brand?: string; timeWindow?: string; geography?: string }>;
+  searchParams: Promise<{ page?: string; brand?: string; timeWindow?: string; geography?: string; pillar?: string }>;
 }) {
-  const { page: pageParam, brand: brandCode = 'ONC-101', timeWindow = 'Last 7 days', geography = 'Nation' } = await searchParams;
+  const VALID_PILLARS = ['Demand', 'Start Ops', 'Execution', 'Structure'] as const;
+  const { page: pageParam, brand: brandCode = 'ONC-101', timeWindow = 'Last 7 days', geography = 'Nation', pillar: pillarParam } = await searchParams;
+  const pillar = VALID_PILLARS.includes(pillarParam as typeof VALID_PILLARS[number])
+    ? pillarParam
+    : undefined;
   const page = Math.max(1, parseInt(pageParam ?? '1', 10));
 
   const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
@@ -23,7 +27,20 @@ export default async function InsightsPage({
       })
     : null;
 
-  const where = dataRun ? { brandId: brand!.id, dataRunId: dataRun.id } : null;
+  const fallbackDataRun = (!dataRun && geography !== 'Nation' && brand)
+    ? await prisma.dataRun.findFirst({
+        where: { brandId: brand.id, status: 'complete', timeWindow, geography: 'Nation' },
+        orderBy: { runAt: 'desc' },
+      })
+    : null;
+  const effectiveDataRun = dataRun ?? fallbackDataRun;
+  const geographyFallback = fallbackDataRun !== null;
+
+  const where = effectiveDataRun ? {
+    brandId: brand!.id,
+    dataRunId: effectiveDataRun.id,
+    ...(pillar ? { pillar } : {}),
+  } : null;
 
   const [insightsRaw, totalCount] = where
     ? await Promise.all([
@@ -45,6 +62,9 @@ export default async function InsightsPage({
       totalCount={totalCount}
       page={page}
       pageSize={PAGE_SIZE}
+      pillar={pillar ?? ''}
+      geographyFallback={geographyFallback}
+      geography={geography}
     />
   );
 }

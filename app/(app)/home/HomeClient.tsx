@@ -65,6 +65,8 @@ interface HomeClientProps {
   drivers: Driver[];
   topInsightRisks: InsightRisk[];
   dataRunAt?: string | null;
+  geographyFallback: boolean;
+  selectedGeography: string;
 }
 
 const PILLAR_COLORS: Record<string, string> = {
@@ -105,7 +107,7 @@ function freshnessColor(freshness: string) {
   return '#DC2626';
 }
 
-export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt }: HomeClientProps) {
+export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt, geographyFallback, selectedGeography }: HomeClientProps) {
   const { geography, searchQuery } = useFilters();
   const [pulseBrief, setPulseBrief] = useState<string | null>(null);
   const [isBriefLoading, setIsBriefLoading] = useState(false);
@@ -173,6 +175,12 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
 
   return (
     <div className="space-y-8">
+      {geographyFallback && (
+        <div className="mb-4 px-4 py-2.5 rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] text-sm text-[#1D4ED8] flex items-center gap-2">
+          <span className="font-medium">Note:</span> No data available for {selectedGeography} — showing Nation-level data.
+        </div>
+      )}
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}

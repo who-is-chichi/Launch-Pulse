@@ -19,16 +19,25 @@ export default async function HomePage({
       })
     : null;
 
+  const fallbackDataRun = (!dataRun && geography !== 'Nation' && brand)
+    ? await prisma.dataRun.findFirst({
+        where: { brandId: brand.id, status: 'complete', timeWindow, geography: 'Nation' },
+        orderBy: { runAt: 'desc' },
+      })
+    : null;
+  const effectiveDataRun = dataRun ?? fallbackDataRun;
+  const geographyFallback = fallbackDataRun !== null; // only true when Nation fallback data actually exists
+
   const [kpiTilesRaw, insightsRaw, actions, datasets, drivers] = await Promise.all([
-    dataRun
+    effectiveDataRun
       ? prisma.kpiTile.findMany({
-          where: { brandId: brand!.id, dataRunId: dataRun.id },
+          where: { brandId: brand!.id, dataRunId: effectiveDataRun.id },
           orderBy: { sortOrder: 'asc' },
         })
       : [],
-    dataRun
+    effectiveDataRun
       ? prisma.insight.findMany({
-          where: { brandId: brand!.id, dataRunId: dataRun.id },
+          where: { brandId: brand!.id, dataRunId: effectiveDataRun.id },
         })
       : [],
     brand
@@ -38,12 +47,12 @@ export default async function HomePage({
           take: 3,
         })
       : [],
-    dataRun
-      ? prisma.dataset.findMany({ where: { dataRunId: dataRun.id } })
+    effectiveDataRun
+      ? prisma.dataset.findMany({ where: { dataRunId: effectiveDataRun.id } })
       : [],
-    dataRun
+    effectiveDataRun
       ? prisma.driver.findMany({
-          where: { insight: { dataRunId: dataRun.id } },
+          where: { insight: { dataRunId: effectiveDataRun.id } },
         })
       : [],
   ]);
@@ -69,14 +78,16 @@ export default async function HomePage({
   return (
     <HomeClient
       brandCode={brandCode}
-      dataRunId={dataRun?.id ?? ''}
+      dataRunId={effectiveDataRun?.id ?? ''}
       kpiTiles={kpiTiles}
       insights={insights}
       actions={actions}
       datasets={datasets}
       drivers={drivers}
       topInsightRisks={risks}
-      dataRunAt={dataRun?.runAt?.toISOString() ?? null}
+      dataRunAt={effectiveDataRun?.runAt?.toISOString() ?? null}
+      geographyFallback={geographyFallback}
+      selectedGeography={geography}
     />
   );
 }
