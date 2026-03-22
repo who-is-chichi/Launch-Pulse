@@ -38,6 +38,25 @@ model Brand {
   normalizationRules NormalizationRule[]
   publishedMappings  PublishedMapping[]
   crosswalkStats     CrosswalkStat[]
+  // Bronze control
+  bronzeIngestionRuns        BronzeCtlIngestionRun[]
+  bronzeFileManifests        BronzeCtlFileManifest[]
+  bronzeRowRejections        BronzeCtlRowRejection[]
+  bronzeSchemaRegistry       BronzeCtlSchemaRegistry[]
+  bronzeMappingIssues        BronzeCtlMappingValidationIssue[]
+  bronzeUnmappedFields       BronzeCtlUnmappedFieldsRegistry[]
+  // Bronze raw
+  bronzeClaimsRaw            BronzeClaimsRaw[]
+  bronzeSpCasesRaw           BronzeSpCasesRaw[]
+  bronzeSpStatusHistoryRaw   BronzeSpStatusHistoryRaw[]
+  bronzeDispenseRaw          BronzeDispenseRaw[]
+  bronzeShipmentsRaw         BronzeShipmentsRaw[]
+  bronzeCallsRaw             BronzeCallsRaw[]
+  bronzeHcpMasterRaw         BronzeHcpMasterRaw[]
+  bronzeHcoMasterRaw         BronzeHcoMasterRaw[]
+  bronzeAffiliationsRaw      BronzeAffiliationsRaw[]
+  bronzeTerritoryAlignmentRaw BronzeTerritoryAlignmentRaw[]
+  bronzeRepRosterRaw         BronzeRepRosterRaw[]
 }
 
 model DataRun {
@@ -342,4 +361,757 @@ model UserPreference {
   defaultGeography    String   @default("Nation")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// BRONZE CONTROL / OPS TABLES
+// ─────────────────────────────────────────────
+
+model BronzeCtlIngestionRun {
+  id                 String    @id @default(cuid())
+  clientId           String
+  brandId            String?
+  brand              Brand?    @relation(fields: [brandId], references: [id])
+  runType            String    @default("full")     // full | incremental | replay | backfill
+  sourceSystem       String
+  sourceFeedName     String
+  triggerType        String    @default("api")      // schedule | manual | api | replay
+  pipelineVersion    String?
+  orchestratorJobId  String?
+  startedAt          DateTime  @default(now())
+  endedAt            DateTime?
+  status             String    @default("running")  // running | success | partial_success | failed
+  filesDetected      Int       @default(0)
+  filesLoaded        Int       @default(0)
+  recordsRead        BigInt    @default(0)
+  recordsLoaded      BigInt    @default(0)
+  recordsRejected    BigInt    @default(0)
+  errorCount         Int       @default(0)
+  errorSummary       String?
+  metadata           Json?
+  createdBy          String?
+  createdAt          DateTime  @default(now())
+  fileManifests      BronzeCtlFileManifest[]
+  rowRejections      BronzeCtlRowRejection[]
+  mappingIssues      BronzeCtlMappingValidationIssue[]
+
+  @@index([clientId, startedAt])
+  @@index([brandId])
+}
+
+model BronzeCtlFileManifest {
+  id                      String                @id @default(cuid())
+  ingestionRunId          String
+  ingestionRun            BronzeCtlIngestionRun @relation(fields: [ingestionRunId], references: [id])
+  clientId                String
+  brandId                 String?
+  brand                   Brand?                @relation(fields: [brandId], references: [id])
+  sourceSystem            String
+  sourceFeedName          String
+  brandCode               String?
+  sourceFileName          String
+  sourceFilePath          String                @default("")
+  fileType                String                @default("json")  // csv | xlsx | json | parquet
+  compressionType         String?
+  fileSizeBytes           BigInt?
+  checksumMd5             String?
+  checksumSha256          String?
+  sourceFileDate          DateTime?
+  sourceDropTs            DateTime?
+  receivedTs              DateTime              @default(now())
+  headerRow               Json?
+  rowCountRaw             BigInt?
+  rowCountLoaded          BigInt                @default(0)
+  rowCountRejected        BigInt                @default(0)
+  schemaVersionDetected   String?
+  status                  String                @default("received")  // received | parsed | loaded | partial | failed | archived
+  errorSummary            String?
+  archivedFlag            Boolean               @default(false)
+  createdAt               DateTime              @default(now())
+  rowRejections           BronzeCtlRowRejection[]
+  unmappedFields          BronzeCtlUnmappedFieldsRegistry[]
+
+  @@index([clientId, receivedTs])
+  @@index([ingestionRunId])
+}
+
+model BronzeCtlRowRejection {
+  id               String                @id @default(cuid())
+  ingestionRunId   String
+  ingestionRun     BronzeCtlIngestionRun @relation(fields: [ingestionRunId], references: [id])
+  fileManifestId   String?
+  fileManifest     BronzeCtlFileManifest? @relation(fields: [fileManifestId], references: [id])
+  clientId         String
+  brandId          String?
+  brand            Brand?                @relation(fields: [brandId], references: [id])
+  sourceSystem     String
+  sourceFeedName   String
+  datasetName      String
+  sourceFileName   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  rejectionStage   String                // parse | schema | required_field | type_cast | mapping
+  rejectionCode    String
+  rejectionReason  String
+  rawPayload       Json
+  createdAt        DateTime              @default(now())
+
+  @@index([clientId, ingestionRunId])
+  @@index([brandId])
+}
+
+model BronzeCtlSchemaRegistry {
+  id                String   @id @default(cuid())
+  clientId          String
+  brandId           String?
+  brand             Brand?   @relation(fields: [brandId], references: [id])
+  sourceSystem      String
+  sourceFeedName    String
+  datasetName       String
+  schemaVersion     String
+  columnDefinitions Json
+  detectedAt        DateTime @default(now())
+  activeFlag        Boolean  @default(true)
+  notes             String?
+
+  @@index([clientId, sourceSystem, sourceFeedName])
+  @@index([brandId])
+}
+
+model BronzeCtlMappingValidationIssue {
+  id               String                @id @default(cuid())
+  ingestionRunId   String
+  ingestionRun     BronzeCtlIngestionRun @relation(fields: [ingestionRunId], references: [id])
+  fileManifestId   String?
+  clientId         String
+  brandId          String?
+  brand            Brand?                @relation(fields: [brandId], references: [id])
+  datasetName      String
+  issueLevel       String                // warning | error
+  issueType        String                // missing_required_field | duplicate_mapping | bad_transform | unknown_column
+  sourceColumnName String?
+  targetFieldName  String?
+  issueMessage     String
+  issueDetails     Json?
+  createdAt        DateTime              @default(now())
+
+  @@index([clientId, ingestionRunId])
+  @@index([brandId])
+}
+
+model BronzeCtlUnmappedFieldsRegistry {
+  id               String                 @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?                 @relation(fields: [brandId], references: [id])
+  datasetName      String
+  sourceSystem     String
+  sourceFeedName   String
+  fileManifestId   String?
+  fileManifest     BronzeCtlFileManifest? @relation(fields: [fileManifestId], references: [id])
+  sourceColumnName String
+  sampleValues     Json?
+  firstSeenAt      DateTime               @default(now())
+  lastSeenAt       DateTime               @default(now())
+  status           String                 @default("unreviewed")  // unreviewed | accepted_extra | map_later | ignored
+  notes            String?
+
+  @@index([clientId, datasetName])
+  @@index([brandId])
+}
+
+// ─────────────────────────────────────────────
+// BRONZE RAW BUSINESS TABLES
+// Common metadata block on every table:
+//   bronzeRecordId (= id), clientId, brandId, datasetName,
+//   sourceSystem, sourceFeedName, ingestionRunId, fileManifestId,
+//   sourceFileName, sourceFilePath, sourceRowNumber, sourcePrimaryKey,
+//   sourceExtractTs, sourceRecordTs, opType, isDeletedFlag,
+//   schemaVersion, recordHash, rawPayload, parseStatus,
+//   parseErrorCode, parseErrorDetail, partitionDate, loadedAt, createdAt
+// ─────────────────────────────────────────────
+
+model BronzeClaimsRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("claims")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")  // parsed | partial | failed
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific columns
+  claimId           String?
+  claimLineId       String?
+  patientToken      String?
+  patientAgeBand    String?
+  patientGender     String?
+  payerChannel      String?
+  payerNameRaw      String?
+  planNameRaw       String?
+  planIdRaw         String?
+  pbmNameRaw        String?
+  drugNameRaw       String?
+  brandNameRaw      String?
+  ndc11             String?
+  trxNrxFlag        String?
+  rxFillNumber      Int?
+  quantity          Decimal?  @db.Decimal(18, 4)
+  daysSupply        Int?
+  writtenDate       DateTime?
+  fillDate          DateTime?
+  serviceDate       DateTime?
+  prescriberNpiRaw  String?
+  prescriberIdRaw   String?
+  hcpNameRaw        String?
+  hcoIdRaw          String?
+  hcoNameRaw        String?
+  specialtyRaw      String?
+  zip3              String?
+  zip5              String?
+  stateCode         String?
+  territoryCodeRaw  String?
+  claimStatusRaw    String?
+  rejectionCodeRaw  String?
+  rejectionReasonRaw String?
+  paidAmountRaw     Decimal?  @db.Decimal(18, 4)
+  copayAmountRaw    Decimal?  @db.Decimal(18, 4)
+  sourceLastUpdatedTs DateTime?
+
+  @@index([brandId, fillDate])
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeSpCasesRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("sp_cases")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  spCaseId              String?
+  referralId            String?
+  patientToken          String?
+  prescriberNpiRaw      String?
+  prescriberIdRaw       String?
+  hcpNameRaw            String?
+  hcoIdRaw              String?
+  hcoNameRaw            String?
+  brandNameRaw          String?
+  drugNameRaw           String?
+  caseStatusRaw         String?
+  caseSubstatusRaw      String?
+  casePriorityRaw       String?
+  referralDate          DateTime?
+  intakeDate            DateTime?
+  bvStartDate           DateTime?
+  bvCompleteDate        DateTime?
+  paStartDate           DateTime?
+  paOutcomeDate         DateTime?
+  patientOutreachDate   DateTime?
+  approvalDate          DateTime?
+  firstDispenseDateRaw  DateTime?
+  shipmentDateRaw       DateTime?
+  abandonmentDate       DateTime?
+  closureDate           DateTime?
+  hubVendorRaw          String?
+  pharmacyNameRaw       String?
+  pharmacyIdRaw         String?
+  payerNameRaw          String?
+  planNameRaw           String?
+  planIdRaw             String?
+  rejectionReasonRaw    String?
+  supportProgramRaw     String?
+  sourceLastUpdatedTs   DateTime?
+
+  @@index([brandId, referralDate])
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeSpStatusHistoryRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("sp_status_history")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  spStatusEventId    String?
+  spCaseId           String?
+  statusRaw          String?
+  substatusRaw       String?
+  statusEffectiveTs  DateTime?
+  statusEndTs        DateTime?
+  changedByRaw       String?
+  changeReasonRaw    String?
+  eventSequence      Int?
+  sourceLastUpdatedTs DateTime?
+
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeDispenseRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("dispense")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  dispenseId                String?
+  spCaseId                  String?
+  patientToken              String?
+  prescriberNpiRaw          String?
+  ndc11                     String?
+  brandNameRaw              String?
+  dispenseDate              DateTime?
+  shipDate                  DateTime?
+  fillNumber                Int?
+  quantity                  Decimal?  @db.Decimal(18, 4)
+  daysSupply                Int?
+  dispensingPharmacyIdRaw   String?
+  dispensingPharmacyNameRaw String?
+  dispenseStatusRaw         String?
+  dispenseChannelRaw        String?
+  sourceLastUpdatedTs       DateTime?
+
+  @@index([brandId, dispenseDate])
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeShipmentsRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("shipments")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  shipmentId               String?
+  spCaseId                 String?
+  orderIdRaw               String?
+  patientToken             String?
+  brandNameRaw             String?
+  ndc11                    String?
+  shipmentDate             DateTime?
+  deliveryDateRaw          DateTime?
+  shipmentStatusRaw        String?
+  shipmentQuantity         Decimal?  @db.Decimal(18, 4)
+  daysSupplyRaw            Int?
+  shippingPharmacyIdRaw    String?
+  shippingPharmacyNameRaw  String?
+  carrierRaw               String?
+  trackingNumberRaw        String?
+  sourceLastUpdatedTs      DateTime?
+
+  @@index([brandId, shipmentDate])
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeCallsRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("calls")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  callId                   String?
+  interactionIdRaw         String?
+  repIdRaw                 String?
+  repEmailRaw              String?
+  repNameRaw               String?
+  managerIdRaw             String?
+  territoryCodeRaw         String?
+  territoryNameRaw         String?
+  prescriberNpiRaw         String?
+  hcpIdRaw                 String?
+  hcoIdRaw                 String?
+  callDate                 DateTime?
+  callTs                   DateTime?
+  callTypeRaw              String?
+  channelRaw               String?
+  callStatusRaw            String?
+  callPlanFlagRaw          Boolean?
+  callDurationMinutesRaw   Decimal?  @db.Decimal(10, 2)
+  productDiscussedRaw      String?
+  detailPriorityRaw        String?
+  sampleFlagRaw            Boolean?
+  speakerProgramFlagRaw    Boolean?
+  sourceLastUpdatedTs      DateTime?
+
+  @@index([brandId, callDate])
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeHcpMasterRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("hcp_master")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  hcpSourceId      String?
+  npi              String?
+  firstNameRaw     String?
+  lastNameRaw      String?
+  middleNameRaw    String?
+  fullNameRaw      String?
+  specialtyRaw     String?
+  specialtyGroupRaw String?
+  designationRaw   String?
+  emailRaw         String?
+  phoneRaw         String?
+  addressLine1Raw  String?
+  addressLine2Raw  String?
+  cityRaw          String?
+  stateCodeRaw     String?
+  zip5Raw          String?
+  zip3Raw          String?
+  countryRaw       String?
+  statusRaw        String?
+  deceasedFlagRaw  Boolean?
+  sourceLastUpdatedTs DateTime?
+
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeHcoMasterRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("hco_master")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  hcoSourceId      String?
+  accountIdRaw     String?
+  accountNameRaw   String?
+  accountTypeRaw   String?
+  siteOfCareRaw    String?
+  hospitalFlagRaw  Boolean?
+  idnFlagRaw       Boolean?
+  addressLine1Raw  String?
+  addressLine2Raw  String?
+  cityRaw          String?
+  stateCodeRaw     String?
+  zip5Raw          String?
+  zip3Raw          String?
+  countryRaw       String?
+  statusRaw        String?
+  sourceLastUpdatedTs DateTime?
+
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeAffiliationsRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("affiliations")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  affiliationRecordId          String?
+  childEntityIdRaw             String?
+  childEntityTypeRaw           String?
+  parentEntityIdRaw            String?
+  parentEntityTypeRaw          String?
+  relationshipTypeRaw          String?
+  primaryAffiliationFlagRaw    Boolean?
+  ownershipPctRaw              Float?
+  effectiveStartDate           DateTime?
+  effectiveEndDate             DateTime?
+  activeFlagRaw                Boolean?
+  sourceLastUpdatedTs          DateTime?
+
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeTerritoryAlignmentRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("territory_alignment")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  alignmentRecordId   String?
+  entityIdRaw         String?
+  entityTypeRaw       String?
+  territoryCodeRaw    String?
+  territoryNameRaw    String?
+  regionCodeRaw       String?
+  regionNameRaw       String?
+  districtCodeRaw     String?
+  districtNameRaw     String?
+  repIdRaw            String?
+  repNameRaw          String?
+  managerIdRaw        String?
+  alignmentStartDate  DateTime?
+  alignmentEndDate    DateTime?
+  activeFlagRaw       Boolean?
+  primaryFlagRaw      Boolean?
+  sourceLastUpdatedTs DateTime?
+
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
+}
+
+model BronzeRepRosterRaw {
+  id               String    @id @default(cuid())
+  clientId         String
+  brandId          String?
+  brand            Brand?    @relation(fields: [brandId], references: [id])
+  datasetName      String    @default("rep_roster")
+  sourceSystem     String
+  sourceFeedName   String
+  ingestionRunId   String
+  fileManifestId   String?
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceRowNumber  BigInt?
+  sourcePrimaryKey String?
+  sourceExtractTs  DateTime?
+  sourceRecordTs   DateTime?
+  opType           String?
+  isDeletedFlag    Boolean   @default(false)
+  schemaVersion    String?
+  recordHash       String
+  rawPayload       Json
+  parseStatus      String    @default("parsed")
+  parseErrorCode   String?
+  parseErrorDetail String?
+  partitionDate    DateTime  @default(now())
+  loadedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  // Source-specific
+  repSourceId          String?
+  employeeIdRaw        String?
+  repNameRaw           String?
+  repEmailRaw          String?
+  roleRaw              String?
+  teamRaw              String?
+  territoryCodeRaw     String?
+  territoryNameRaw     String?
+  districtCodeRaw      String?
+  regionCodeRaw        String?
+  managerIdRaw         String?
+  managerNameRaw       String?
+  employmentStatusRaw  String?
+  hireDateRaw          DateTime?
+  terminationDateRaw   DateTime?
+  sourceLastUpdatedTs  DateTime?
+
+  @@index([brandId, ingestionRunId])
+  @@index([clientId, partitionDate])
 }

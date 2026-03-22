@@ -5,6 +5,54 @@
 
 ---
 
+# Sprint 15 — Bronze Data Layer + Ingest API (2026-03-22)
+
+## Status: COMPLETE
+
+## Context
+Build the full production-grade Bronze layer: 6 control/audit models + 11 raw business feed models (append-only, source-native, with rawPayload JSON + common metadata block on every row), plus `POST /api/ingest/facts` endpoint with ingestion run tracking, row rejection logging, and auto engine trigger.
+
+## Tasks
+
+### Pre-work
+- [x] Write tasks/todo.md
+
+### Agent 1 — Schema + migration
+- [x] Add 6 BronzeCtl* models to `prisma/schema.prisma`
+- [x] Add 11 Bronze*Raw models to `prisma/schema.prisma`
+- [x] Add Brand relations for all 17 models
+- [x] Run `npx prisma migrate dev --name add_bronze_layer`
+- [x] Run `npx tsc --noEmit`
+
+### Agent 2 — Ingest route (after Agent 1)
+- [x] Write `lib/ingest-helpers.ts` (rowHash util)
+- [x] Write `app/api/ingest/facts/route.ts` (RBAC + ingestion run + file manifest + per-table inserts + engine trigger)
+- [x] Run `npx tsc --noEmit`
+
+### Agent 3 — Tests + sprint15-check (after Agent 1, parallel with Agent 2)
+- [x] Write `__tests__/ingest-helpers.test.ts` (rowHash determinism tests)
+- [x] Write `scripts/sprint15-check.ts` (file existence + grep smoke checks)
+- [x] Run `npx vitest run __tests__/ingest-helpers.test.ts`
+
+### Agent 4 — Staff Engineer Review
+- [x] RBAC correct (getOrgId + assertBrandAccess, no bare brand lookup)
+- [x] IngestionRun created before rows, updated after
+- [x] rowHash on every row, logger in catch block
+- [x] Engine trigger matches engine/run/route.ts pattern
+
+### Agent 5 — QA
+- [x] `npx tsc --noEmit` — 0 errors ✅
+- [x] `npx vitest run` — 70/70 ✅
+- [x] `npx tsx scripts/qa-check.ts` — 114/114 ✅
+- [x] `npx tsx scripts/regression-check.ts` — 16/16 ✅
+- [x] `npx tsx scripts/sprint15-check.ts` — 30/30 ✅
+
+### Completion
+- [x] Create `notes/2026-03-22-sprint15-bronze-layer.md`
+- [ ] Commit
+
+---
+
 # Sprint 14 — Logout Logger + Engine Threshold Centralization (2026-03-22)
 
 ## Status: COMPLETE
