@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
 import { INSIGHT_STATUSES } from '@/lib/severity';
 import { toast } from 'sonner';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 interface Driver { label: string; confidence: number; description: string; }
 interface MetricChange { metric: string; before: string; after: string; change: string; changePercent: string; direction: string; }
@@ -361,12 +362,62 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       {/* Evidence */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
         <h2 className="text-base font-semibold text-[#0F172A] mb-4">Evidence</h2>
-        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-8 flex items-center justify-center">
-          <div className="text-center text-[#94A3B8]">
-            <div className="text-4xl mb-2">📊</div>
-            <div className="text-sm">Trend charts and detailed analytics</div>
+        {insight.metricChanges.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {insight.metricChanges.map((m) => {
+              // NOTE: Sparkline data is seeded/interpolated from before→after values.
+              // Replace with real time-series from MetricTimeSeries Gold table in future sprint.
+              function seededRandom(seed: string, index: number): number {
+                const hash = seed.split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 1), 0);
+                return ((hash * (index + 1) * 2654435761) % 2 ** 32) / 2 ** 32;
+              }
+              function generateSparklineData(metric: string, before: string, after: string): { value: number }[] {
+                const start = parseFloat(before.replace(/[^0-9.]/g, '')) || 0;
+                const end = parseFloat(after.replace(/[^0-9.]/g, '')) || 0;
+                return Array.from({ length: 6 }, (_, i) => {
+                  const base = start + (end - start) * (i / 5);
+                  const jitter = (seededRandom(metric, i) - 0.5) * Math.abs(end - start) * 0.15;
+                  return { value: Math.round((base + jitter) * 100) / 100 };
+                });
+              }
+              const sparkData = generateSparklineData(m.metric, m.before, m.after);
+              const lineColor = m.direction === 'up' ? '#16A34A' : '#DC2626';
+              return (
+                <div key={m.metric} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold text-[#0F172A] leading-tight">{m.metric}</span>
+                    <span className={`text-[11px] font-medium ${m.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                      {m.direction === 'up' ? '↑' : '↓'}
+                    </span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={48}>
+                    <LineChart data={sparkData}>
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke={lineColor}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-[#94A3B8]">{m.before} → {m.after}</span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${m.direction === 'up' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      {m.changePercent}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        ) : (
+          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-8 flex items-center justify-center">
+            <div className="text-center text-[#94A3B8]">
+              <div className="text-sm">No metric changes recorded</div>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2 mt-4">
           <span className="text-[11px] text-[#94A3B8] font-medium uppercase tracking-wider">Data sources:</span>
           {[...new Set([...(PILLAR_SOURCES[insight.pillar] ?? []), ...insight.metricChanges.map(m => m.metric)])].map((source) => (
