@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
 import AISummaryPanel from '@/components/AISummaryPanel';
 import { exportInsightsToCsv } from '@/lib/export-csv';
+import BulkAssignModal from '@/components/BulkAssignModal';
 
 interface Insight {
   id: string;
@@ -68,6 +69,7 @@ export default function InsightsClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { searchQuery, brand, timeWindow } = useFilters();
   const [isRunning, setIsRunning] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const totalPages = Math.ceil(totalCount / pageSize);
 
   useEffect(() => {
@@ -109,6 +111,8 @@ export default function InsightsClient({
     region: i.region,
     status: i.status,
   }));
+
+  const selectedInsights = initialInsights.filter(i => selectedIds.has(i.id));
 
   return (
     <div className="space-y-6">
@@ -172,7 +176,12 @@ export default function InsightsClient({
             <Download className="w-4 h-4" />
             {selectedIds.size > 0 ? `Export (${selectedIds.size})` : 'Export Selected'}
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={selectedIds.size === 0 || !hasMinRole(userRole, 'regional_director')}
+            onClick={() => setShowBulkModal(true)}
+          >
             <UserPlus className="w-4 h-4" />
             Bulk Assign
           </Button>
@@ -353,6 +362,17 @@ export default function InsightsClient({
           </Button>
         </div>
       </div>
+
+      <BulkAssignModal
+        open={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        insights={selectedInsights}
+        brandCode={brand}
+        onSuccess={() => {
+          setShowBulkModal(false);
+          setSelectedIds(new Set());
+        }}
+      />
     </div>
   );
 }
