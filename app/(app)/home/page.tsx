@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { sortBySeverityDesc } from '@/lib/severity';
 import HomeClient from './HomeClient';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +11,11 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ brand?: string; timeWindow?: string; geography?: string }>;
 }) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('session')?.value;
+  const session = token ? await verifyToken(token).catch(() => null) : null;
+  const userRole = session?.role ?? 'sales_rep';
+
   const { brand: brandCode = 'ONC-101', timeWindow = 'Last 7 days', geography = 'Nation' } = await searchParams;
   const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
 
@@ -42,7 +49,7 @@ export default async function HomePage({
       : [],
     brand
       ? prisma.action.findMany({
-          where: { brandId: brand.id, status: { not: 'done' } },
+          where: { brandId: brand.id, status: { not: 'done' }, isActive: true },
           orderBy: { dueDate: 'asc' },
           take: 3,
         })
@@ -88,6 +95,7 @@ export default async function HomePage({
       dataRunAt={effectiveDataRun?.runAt?.toISOString() ?? null}
       geographyFallback={geographyFallback}
       selectedGeography={geography}
+      userRole={userRole}
     />
   );
 }

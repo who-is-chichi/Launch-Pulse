@@ -11,6 +11,7 @@ import { Download, FileText, Sparkles, Loader2, X } from 'lucide-react';
 import { useFilters } from '@/components/FilterContext';
 import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
+import { hasMinRole } from '@/lib/roles';
 
 interface KpiTile {
   id: string;
@@ -67,6 +68,7 @@ interface HomeClientProps {
   dataRunAt?: string | null;
   geographyFallback: boolean;
   selectedGeography: string;
+  userRole?: string;
 }
 
 const PILLAR_COLORS: Record<string, string> = {
@@ -107,7 +109,7 @@ function freshnessColor(freshness: string) {
   return '#DC2626';
 }
 
-export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt, geographyFallback, selectedGeography }: HomeClientProps) {
+export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt, geographyFallback, selectedGeography, userRole = 'sales_rep' }: HomeClientProps) {
   const { geography, searchQuery } = useFilters();
   const [pulseBrief, setPulseBrief] = useState<string | null>(null);
   const [isBriefLoading, setIsBriefLoading] = useState(false);
@@ -291,30 +293,36 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => {
-              const a = document.createElement('a');
-              a.href = `/api/export/exec-pack?brand=${encodeURIComponent(brandCode)}&runId=${encodeURIComponent(dataRunId)}`;
-              a.download = `exec-pack-${brandCode}.html`;
-              a.click();
-            }}
-          >
-            <Download className="w-4 h-4" />
-            Export Exec Pack
-          </Button>
-          {briefCooldownSecs > 0 && !isBriefLoading && (
-            <span className="text-[11px] text-[#94A3B8]">Wait {briefCooldownSecs}s</span>
+          {hasMinRole(userRole, 'executive') && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = `/api/export/exec-pack?brand=${encodeURIComponent(brandCode)}&runId=${encodeURIComponent(dataRunId)}`;
+                a.download = `exec-pack-${brandCode}.html`;
+                a.click();
+              }}
+            >
+              <Download className="w-4 h-4" />
+              Export Exec Pack
+            </Button>
           )}
-          <Button className="gap-2" onClick={handlePulseBrief} disabled={isBriefLoading || briefCooldownSecs > 0}>
-            {isBriefLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            {isBriefLoading ? 'Generating...' : 'Generate Pulse Brief'}
-          </Button>
+          {hasMinRole(userRole, 'executive') && (
+            <>
+              {briefCooldownSecs > 0 && !isBriefLoading && (
+                <span className="text-[11px] text-[#94A3B8]">Wait {briefCooldownSecs}s</span>
+              )}
+              <Button className="gap-2" onClick={handlePulseBrief} disabled={isBriefLoading || briefCooldownSecs > 0}>
+                {isBriefLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                {isBriefLoading ? 'Generating...' : 'Generate Pulse Brief'}
+              </Button>
+            </>
+          )}
         </div>
       </motion.div>
 
@@ -386,7 +394,7 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
                   impact: insight.impact,
                   region: insight.region,
                 }}
-                onAssign={handleOpenAssign}
+                onAssign={hasMinRole(userRole, 'regional_director') ? handleOpenAssign : undefined}
               />
             ))
           ) : (

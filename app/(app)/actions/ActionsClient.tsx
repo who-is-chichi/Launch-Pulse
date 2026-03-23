@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SeverityBadge from '@/components/SeverityBadge';
 import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
+import { hasMinRole } from '@/lib/roles';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
@@ -174,7 +175,7 @@ const defaultImpactForm = (): ImpactForm => ({
   completedDate: today,
 });
 
-export default function ActionsClient({ actions: initialActions }: { actions: Action[] }) {
+export default function ActionsClient({ actions: initialActions, userRole = 'sales_rep' }: { actions: Action[]; userRole?: string }) {
   const [activeTab, setActiveTab] = useState('board');
   const [actions, setActions] = useState(initialActions);
   const { searchQuery, brand } = useFilters();
@@ -303,10 +304,12 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
           <h1 className="text-2xl font-semibold text-[#0F172A] mb-1">Actions & Impact</h1>
           <p className="text-sm text-[#64748B]">Turn insights into ownership and measure outcomes</p>
         </div>
-        <Button className="gap-2" onClick={() => setShowManualModal(true)}>
-          <Plus className="w-4 h-4" />
-          Create Action Manually
-        </Button>
+        {hasMinRole(userRole, 'regional_director') && (
+          <Button className="gap-2" onClick={() => setShowManualModal(true)}>
+            <Plus className="w-4 h-4" />
+            Create Action Manually
+          </Button>
+        )}
       </motion.div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

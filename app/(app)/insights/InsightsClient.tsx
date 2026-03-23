@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, Download, UserPlus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { hasMinRole } from '@/lib/roles';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -49,6 +50,7 @@ export default function InsightsClient({
   pillar,
   geographyFallback,
   geography,
+  userRole = 'sales_rep',
 }: {
   initialInsights: Insight[];
   totalCount: number;
@@ -57,6 +59,7 @@ export default function InsightsClient({
   pillar: string;
   geographyFallback: boolean;
   geography: string;
+  userRole?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -125,36 +128,38 @@ export default function InsightsClient({
           <p className="text-sm text-[#64748B]">Explore and manage all insights across your launch</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            disabled={isRunning}
-            onClick={async () => {
-              setIsRunning(true);
-              try {
-                const res = await fetch('/api/engine/run', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ brandCode: brand }),
-                });
-                if (res.status === 429) {
-                  toast.error('Rate limited — try again shortly');
-                } else if (!res.ok) {
+          {hasMinRole(userRole, 'analytics_manager') && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={isRunning}
+              onClick={async () => {
+                setIsRunning(true);
+                try {
+                  const res = await fetch('/api/engine/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ brandCode: brand }),
+                  });
+                  if (res.status === 429) {
+                    toast.error('Rate limited — try again shortly');
+                  } else if (!res.ok) {
+                    toast.error('Engine run failed');
+                  } else {
+                    toast.success('Insights refreshed');
+                    router.refresh();
+                  }
+                } catch {
                   toast.error('Engine run failed');
-                } else {
-                  toast.success('Insights refreshed');
-                  router.refresh();
+                } finally {
+                  setIsRunning(false);
                 }
-              } catch {
-                toast.error('Engine run failed');
-              } finally {
-                setIsRunning(false);
-              }
-            }}
-          >
-            <RefreshCw className={`w-4 h-4 ${isRunning ? 'animate-spin' : ''}`} />
-            {isRunning ? 'Running...' : 'Refresh Insights'}
-          </Button>
+              }}
+            >
+              <RefreshCw className={`w-4 h-4 ${isRunning ? 'animate-spin' : ''}`} />
+              {isRunning ? 'Running...' : 'Refresh Insights'}
+            </Button>
+          )}
           <Button
             variant="outline"
             className="gap-2"
@@ -231,7 +236,7 @@ export default function InsightsClient({
         </Button>
       </div>
 
-      <AISummaryPanel insights={summaryInsights} />
+      {hasMinRole(userRole, 'executive') && <AISummaryPanel insights={summaryInsights} />}
 
       <motion.div
         initial={{ opacity: 0 }}

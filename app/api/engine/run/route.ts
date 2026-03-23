@@ -4,7 +4,7 @@ import { runInsightEngine } from '@/lib/insight-engine';
 import { evaluateActions } from '@/lib/impact-evaluator';
 import { logger } from '@/lib/logger';
 import { Brand } from '@prisma/client';
-import { getOrgId, assertBrandAccess } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, requireRole } from '@/lib/request-context';
 import { checkApiRateLimit } from '@/lib/api-rate-limit';
 
 export async function POST(request: NextRequest) {
@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     let orgId: string;
     let brand: Brand;
     try {
+      requireRole(request, 'analytics_manager');
       orgId = getOrgId(request);
       brand = await assertBrandAccess(orgId, brandCode, 'POST /api/engine/run');
     } catch (err) {
