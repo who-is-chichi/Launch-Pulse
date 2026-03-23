@@ -21,6 +21,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
 import AISummaryPanel from '@/components/AISummaryPanel';
+import CreateActionModal from '@/components/CreateActionModal';
 import { exportInsightsToCsv } from '@/lib/export-csv';
 import BulkAssignModal from '@/components/BulkAssignModal';
 
@@ -70,6 +71,8 @@ export default function InsightsClient({
   const { searchQuery, brand, timeWindow } = useFilters();
   const [isRunning, setIsRunning] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [actionPrefill, setActionPrefill] = useState<{ title: string; severity: 'High' | 'Medium' | 'Low'; notes: string; linkedInsight: string } | null>(null);
   const totalPages = Math.ceil(totalCount / pageSize);
 
   useEffect(() => {
@@ -245,7 +248,14 @@ export default function InsightsClient({
         </Button>
       </div>
 
-      {hasMinRole(userRole, 'executive') && <AISummaryPanel insights={summaryInsights} />}
+      <AISummaryPanel
+        insights={summaryInsights}
+        userRole={userRole}
+        onCreateAction={(prefill) => {
+          setActionPrefill(prefill);
+          setShowActionModal(true);
+        }}
+      />
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -372,6 +382,13 @@ export default function InsightsClient({
           setShowBulkModal(false);
           setSelectedIds(new Set());
         }}
+      />
+      <CreateActionModal
+        open={showActionModal}
+        onClose={() => setShowActionModal(false)}
+        brandCode={brand}
+        prefill={actionPrefill ?? undefined}
+        onSuccess={() => setShowActionModal(false)}
       />
     </div>
   );

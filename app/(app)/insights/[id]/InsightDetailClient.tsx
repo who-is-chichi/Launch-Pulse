@@ -13,6 +13,7 @@ import CreateActionModal from '@/components/CreateActionModal';
 import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
 import { INSIGHT_STATUSES } from '@/lib/severity';
+import { hasMinRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
@@ -156,7 +157,45 @@ const statusColors: Record<string, string> = {
   Monitoring: 'bg-[#F5F3FF] text-[#5B21B6] border-[#DDD6FE]',
 };
 
-export default function InsightDetailClient({ insight, brandCode }: InsightDetailProps & { brandCode: string }) {
+function exportInsightSlide(insight: InsightDetailProps['insight']) {
+  const metricRows = insight.metricChanges.map(m =>
+    `<tr><td>${m.metric}</td><td>${m.before}</td><td>${m.after}</td><td style="color:${m.direction==='up'?'#16A34A':'#DC2626'}">${m.changePercent}</td></tr>`
+  ).join('');
+  const driverList = insight.drivers.slice(0, 3).map(d =>
+    `<li><strong>${d.label}</strong> — ${d.description} (${d.confidence}% confidence)</li>`
+  ).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${insight.headline}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;color:#0F172A;padding:0 20px}
+h1{font-size:1.5rem;margin-bottom:4px}
+.meta{display:flex;gap:12px;margin-bottom:24px;font-size:.875rem;color:#64748B}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #E2E8F0}
+th{font-size:.75rem;text-transform:uppercase;color:#94A3B8}
+ul{margin:12px 0;padding-left:20px}li{margin-bottom:8px}
+.section{margin-bottom:28px}.section h2{font-size:1rem;font-weight:600;margin-bottom:12px;color:#1E40AF}
+.footer{margin-top:40px;font-size:.75rem;color:#94A3B8;border-top:1px solid #E2E8F0;padding-top:12px}
+</style></head><body>
+<h1>${insight.headline}</h1>
+<div class="meta"><span>Pillar: ${insight.pillar}</span><span>Severity: ${insight.severity}</span><span>Region: ${insight.region}</span><span>Generated: ${new Date(insight.generatedDate).toLocaleDateString()}</span></div>
+<div class="section"><h2>Impact</h2><p>${insight.impact}</p></div>
+${metricRows ? `<div class="section"><h2>Metric Changes</h2><table><thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Change</th></tr></thead><tbody>${metricRows}</tbody></table></div>` : ''}
+${driverList ? `<div class="section"><h2>Key Drivers</h2><ul>${driverList}</ul></div>` : ''}
+<div class="footer">Exported from Launch Pulse · ${new Date().toLocaleDateString()}</div>
+</body></html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `insight-${insight.id}-slide.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function InsightDetailClient({
+  insight,
+  brandCode,
+  userRole = 'sales_rep',
+}: InsightDetailProps & { brandCode: string; userRole?: string }) {
   const { brand } = useFilters();
   const [currentStatus, setCurrentStatus] = useState(insight.status);
   const [notesValue, setNotesValue] = useState(insight.notes ?? '');
@@ -205,11 +244,13 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
           <h1 className="text-xl font-semibold text-[#0F172A]">{insight.headline}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
-            <UserPlus className="w-4 h-4" />
-            Assign
-          </Button>
-          <Button variant="outline" className="gap-2">
+          {hasMinRole(userRole, 'regional_director') && (
+            <Button variant="outline" className="gap-2" onClick={() => setShowActionModal(true)}>
+              <UserPlus className="w-4 h-4" />
+              Assign
+            </Button>
+          )}
+          <Button variant="outline" className="gap-2" onClick={() => exportInsightSlide(insight)}>
             <Download className="w-4 h-4" />
             Export Slide
           </Button>
@@ -433,7 +474,6 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-[#0F172A]">Recommended Actions</h2>
           <Button size="sm" className="gap-1.5" onClick={() => setShowActionModal(true)}>
-            <Plus className="w-3.5 h-3.5" />
             Create Action Item
           </Button>
         </div>
@@ -490,11 +530,13 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       <CreateActionModal
         open={showActionModal}
         onClose={() => setShowActionModal(false)}
-        brandCode={brand}
+        brandCode={brand || brandCode}
         prefill={{
+          severity: insight.severity as 'High' | 'Medium' | 'Low',
           linkedInsight: insight.headline,
           insightId: insight.id,
         }}
+        onSuccess={() => setShowActionModal(false)}
       />
     </div>
   );

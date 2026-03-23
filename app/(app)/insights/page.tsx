@@ -1,8 +1,8 @@
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sortBySeverityDesc } from '@/lib/severity';
 import InsightsClient from './InsightsClient';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,9 +14,9 @@ export default async function InsightsPage({
   searchParams: Promise<{ page?: string; brand?: string; timeWindow?: string; geography?: string; pillar?: string }>;
 }) {
   const cookieStore = await cookies();
-  const token = cookieStore.get('session')?.value;
-  const session = token ? await verifyToken(token).catch(() => null) : null;
-  const userRole = session?.role ?? 'sales_rep';
+  const token = cookieStore.get(COOKIE_NAME)?.value ?? '';
+  const payload = token ? await verifyToken(token).catch(() => null) : null;
+  const userRole = payload?.role ?? 'sales_rep';
 
   const VALID_PILLARS = ['Demand', 'Start Ops', 'Execution', 'Structure'] as const;
   const { page: pageParam, brand: brandCode = 'ONC-101', timeWindow = 'Last 7 days', geography = 'Nation', pillar: pillarParam } = await searchParams;
