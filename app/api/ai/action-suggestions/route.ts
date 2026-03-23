@@ -53,7 +53,11 @@ export async function POST(request: NextRequest) {
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(rawText);
+      const cleanText = rawText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/, '')
+        .trim();
+      parsed = JSON.parse(cleanText);
     } catch {
       logger.warn('action-suggestions: AI returned unparseable response', { route: 'ai/action-suggestions', userId });
       return NextResponse.json({ error: 'AI returned an unparseable response. Please try again.' }, { status: 502 });
