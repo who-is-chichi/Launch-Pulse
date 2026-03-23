@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { Prisma, Brand } from '@prisma/client';
 import { sortBySeverityDesc } from '@/lib/severity';
 import { logger } from '@/lib/logger';
-import { getOrgId, assertBrandAccess } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, getUserId, assertUserBrandAccess } from '@/lib/request-context';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     try {
       orgId = getOrgId(request);
       brand = await assertBrandAccess(orgId, brandCode, 'GET /api/insights');
+      await assertUserBrandAccess(getUserId(request), brand.id, request, 'GET /api/insights');
     } catch (err) {
       const status = (err as { status?: number }).status ?? 401;
       return NextResponse.json({ error: (err as Error).message }, { status });

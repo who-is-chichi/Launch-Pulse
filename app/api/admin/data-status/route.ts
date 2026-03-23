@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { Brand } from '@prisma/client';
-import { getOrgId, getUserRole, assertBrandAccess } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, requireRole } from '@/lib/request-context';
 
 export async function GET(request: NextRequest) {
   try {
-    const role = getUserRole(request);
-    if (role !== 'admin' && role !== 'analytics_manager') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try { requireRole(request, 'analytics_manager'); } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: (err as { status?: number }).status ?? 403 });
     }
 
     const { searchParams } = new URL(request.url);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus, User, Calendar, Target, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SeverityBadge from '@/components/SeverityBadge';
 import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
+import { hasMinRole } from '@/lib/roles';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
@@ -174,7 +175,7 @@ const defaultImpactForm = (): ImpactForm => ({
   completedDate: today,
 });
 
-export default function ActionsClient({ actions: initialActions }: { actions: Action[] }) {
+export default function ActionsClient({ actions: initialActions, userRole = 'sales_rep' }: { actions: Action[]; userRole?: string }) {
   const [activeTab, setActiveTab] = useState('board');
   const [actions, setActions] = useState(initialActions);
   const { searchQuery, brand } = useFilters();
@@ -184,6 +185,14 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
   const [impactModal, setImpactModal] = useState<{ id: string } | null>(null);
   const [impactForm, setImpactForm] = useState<ImpactForm>(defaultImpactForm());
   const [impactSubmitting, setImpactSubmitting] = useState(false);
+
+  const [orgUsers, setOrgUsers] = useState<{ id: string; name: string; role: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/users')
+      .then(r => r.json())
+      .then(data => setOrgUsers(data.users ?? []))
+      .catch(() => {});
+  }, []);
 
   // Create action manually modal state
   const [showManualModal, setShowManualModal] = useState(false);
@@ -295,10 +304,12 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
           <h1 className="text-2xl font-semibold text-[#0F172A] mb-1">Actions & Impact</h1>
           <p className="text-sm text-[#64748B]">Turn insights into ownership and measure outcomes</p>
         </div>
-        <Button className="gap-2" onClick={() => setShowManualModal(true)}>
-          <Plus className="w-4 h-4" />
-          Create Action Manually
-        </Button>
+        {hasMinRole(userRole, 'regional_director') && (
+          <Button className="gap-2" onClick={() => setShowManualModal(true)}>
+            <Plus className="w-4 h-4" />
+            Create Action Manually
+          </Button>
+        )}
       </motion.div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -413,7 +424,14 @@ export default function ActionsClient({ actions: initialActions }: { actions: Ac
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Owner <span className="text-red-400">*</span></label>
-                  <input required type="text" placeholder="e.g. Jane Smith" value={manualForm.owner} onChange={e => setManualForm(f => ({ ...f, owner: e.target.value }))} className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors" />
+                  {orgUsers.length > 0 ? (
+                    <select required value={manualForm.owner} onChange={e => setManualForm(f => ({ ...f, owner: e.target.value }))} className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors">
+                      <option value="">Select owner...</option>
+                      {orgUsers.map(u => <option key={u.id} value={u.name}>{u.name} — {u.role}</option>)}
+                    </select>
+                  ) : (
+                    <input required type="text" placeholder="e.g. Jane Smith" value={manualForm.owner} onChange={e => setManualForm(f => ({ ...f, owner: e.target.value }))} className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors" />
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Owner Role <span className="font-normal text-[#94A3B8]">(optional)</span></label>

@@ -34,6 +34,18 @@ async function main() {
     create: { code: 'ONC-101', name: 'ONC-101 Oncology', orgId: 'org_default' },
   });
 
+  // Assign demo user to brand with their org role
+  await prisma.userBrandRole.upsert({
+    where: { userId_brandId: { userId: demoUser.id, brandId: brand.id } },
+    update: {},
+    create: {
+      userId:     demoUser.id,
+      brandId:    brand.id,
+      role:       'analytics_manager',
+      assignedBy: demoUser.id,
+    },
+  });
+
   // Idempotent: clear all existing data for this brand before re-seeding
   const existingRuns = await prisma.dataRun.findMany({ where: { brandId: brand.id }, select: { id: true } });
   const runIds = existingRuns.map(r => r.id);

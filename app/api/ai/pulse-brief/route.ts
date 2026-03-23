@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { anthropic } from '@/lib/anthropic';
 import { logger } from '@/lib/logger';
 import { checkApiRateLimit } from '@/lib/api-rate-limit';
+import { requireRole } from '@/lib/request-context';
 
 const SYSTEM_PROMPT = `You are a pharmaceutical launch analytics AI writing a concise executive pulse brief for commercial leadership.
 
@@ -15,6 +16,9 @@ RULES:
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id');
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try { requireRole(request, 'executive'); } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: (err as { status?: number }).status ?? 403 });
+  }
   const rl = checkApiRateLimit(userId, 'ai');
   if (!rl.allowed) {
     logger.warn('AI rate limit exceeded', { route: 'ai/pulse-brief', userId });

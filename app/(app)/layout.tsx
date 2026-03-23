@@ -3,6 +3,8 @@ import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
 import { Toaster } from 'sonner';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const latestRun = await prisma.dataRun.findFirst({
@@ -22,10 +24,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }) + ' ET'
     : undefined;
 
+  const cookieStore = await cookies();
+  const token = cookieStore.get('session')?.value;
+  const session = token ? await verifyToken(token).catch(() => null) : null;
+  const userRole = session?.role ?? 'sales_rep';
+
   return (
     <FilterProvider>
       <div className="flex h-screen overflow-hidden bg-[#F1F5F9]">
-        <Sidebar lastRunAt={lastRunAt} />
+        <Sidebar lastRunAt={lastRunAt} userRole={userRole} />
         <div className="flex flex-col flex-1 overflow-hidden">
           <TopBar />
           <main className="flex-1 overflow-y-auto px-8 py-6">

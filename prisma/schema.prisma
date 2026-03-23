@@ -8,15 +8,16 @@ generator client {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String          @id @default(cuid())
+  email        String          @unique
   passwordHash String
   name         String
-  role         String   @default("viewer")
-  orgId        String   @default("org_default")
-  tokenVersion Int      @default(1)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         String          @default("viewer")
+  orgId        String          @default("org_default")
+  tokenVersion Int             @default(1)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  brandRoles   UserBrandRole[]
 }
 
 model Brand {
@@ -57,6 +58,7 @@ model Brand {
   bronzeAffiliationsRaw      BronzeAffiliationsRaw[]
   bronzeTerritoryAlignmentRaw BronzeTerritoryAlignmentRaw[]
   bronzeRepRosterRaw         BronzeRepRosterRaw[]
+  userRoles                  UserBrandRole[]
 }
 
 model DataRun {
@@ -190,10 +192,27 @@ model Action {
   severity      String
   expectedLag   String
   status        String       @default("new")
+  isActive      Boolean      @default(true)
   notes         String?      // additional context or instructions
   createdAt     DateTime     @default(now())
-  createdBy     String?      // future RBAC — user who created this action
+  createdBy     String?      // user who created this action
   impactScore   ImpactScore?
+}
+
+model UserBrandRole {
+  id         String   @id @default(cuid())
+  userId     String
+  brandId    String
+  role       String
+  assignedAt DateTime @default(now())
+  assignedBy String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, brandId])
+  @@index([userId])
+  @@index([brandId])
 }
 
 model ImpactScore {

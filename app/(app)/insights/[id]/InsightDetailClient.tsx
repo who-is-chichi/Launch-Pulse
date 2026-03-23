@@ -2,18 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Share2, Download, UserPlus, TrendingDown, TrendingUp, X, Plus, Sparkles, Brain } from 'lucide-react';
+import { ArrowLeft, Share2, Download, UserPlus, TrendingDown, TrendingUp, Plus, Sparkles, Brain } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import PillarTag from '@/components/PillarTag';
 import SeverityBadge from '@/components/SeverityBadge';
 import ActionItem from '@/components/ActionItem';
 import DecisionRiskPanel from '@/components/DecisionRiskPanel';
+import CreateActionModal from '@/components/CreateActionModal';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFilters } from '@/components/FilterContext';
 import { INSIGHT_STATUSES } from '@/lib/severity';
+import { hasMinRole } from '@/lib/roles';
 import { toast } from 'sonner';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 interface Driver { label: string; confidence: number; description: string; }
 interface MetricChange { metric: string; before: string; after: string; change: string; changePercent: string; direction: string; }
@@ -110,7 +112,7 @@ function AIInsightNarrative({ insight }: InsightDetailProps) {
             <Sparkles className="w-3.5 h-3.5 text-white" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-[#0F172A]">AI Interpretation</span>
+            <span className="text-sm font-semibold text-[#0F172A]">AI Summary</span>
             <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-[#DBEAFE] to-[#EDE9FE] text-[10px] font-semibold text-[#4338CA] tracking-wide uppercase">Beta</span>
           </div>
         </div>
@@ -155,24 +157,54 @@ const statusColors: Record<string, string> = {
   Monitoring: 'bg-[#F5F3FF] text-[#5B21B6] border-[#DDD6FE]',
 };
 
-export default function InsightDetailClient({ insight, brandCode }: InsightDetailProps & { brandCode: string }) {
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+
+function exportInsightSlide(insight: InsightDetailProps['insight']) {
+  const metricRows = insight.metricChanges.map(m =>
+    `<tr><td>${escapeHtml(m.metric)}</td><td>${escapeHtml(m.before)}</td><td>${escapeHtml(m.after)}</td><td style="color:${m.direction==='up'?'#16A34A':'#DC2626'}">${escapeHtml(m.changePercent)}</td></tr>`
+  ).join('');
+  const driverList = insight.drivers.slice(0, 3).map(d =>
+    `<li><strong>${escapeHtml(d.label)}</strong> — ${escapeHtml(d.description)} (${d.confidence}% confidence)</li>`
+  ).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(insight.headline)}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;color:#0F172A;padding:0 20px}
+h1{font-size:1.5rem;margin-bottom:4px}
+.meta{display:flex;gap:12px;margin-bottom:24px;font-size:.875rem;color:#64748B}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #E2E8F0}
+th{font-size:.75rem;text-transform:uppercase;color:#94A3B8}
+ul{margin:12px 0;padding-left:20px}li{margin-bottom:8px}
+.section{margin-bottom:28px}.section h2{font-size:1rem;font-weight:600;margin-bottom:12px;color:#1E40AF}
+.footer{margin-top:40px;font-size:.75rem;color:#94A3B8;border-top:1px solid #E2E8F0;padding-top:12px}
+</style></head><body>
+<h1>${escapeHtml(insight.headline)}</h1>
+<div class="meta"><span>Pillar: ${escapeHtml(insight.pillar)}</span><span>Severity: ${escapeHtml(insight.severity)}</span><span>Region: ${escapeHtml(insight.region)}</span><span>Generated: ${new Date(insight.generatedDate).toLocaleDateString()}</span></div>
+<div class="section"><h2>Impact</h2><p>${escapeHtml(insight.impact)}</p></div>
+${metricRows ? `<div class="section"><h2>Metric Changes</h2><table><thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Change</th></tr></thead><tbody>${metricRows}</tbody></table></div>` : ''}
+${driverList ? `<div class="section"><h2>Key Drivers</h2><ul>${driverList}</ul></div>` : ''}
+<div class="footer">Exported from Launch Pulse · ${new Date().toLocaleDateString()}</div>
+</body></html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `insight-${insight.id}-slide.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function InsightDetailClient({
+  insight,
+  brandCode,
+  userRole = 'sales_rep',
+}: InsightDetailProps & { brandCode: string; userRole?: string }) {
   const { brand } = useFilters();
   const [currentStatus, setCurrentStatus] = useState(insight.status);
   const [notesValue, setNotesValue] = useState(insight.notes ?? '');
   const [notesSaved, setNotesSaved] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
-  const [actionForm, setActionForm] = useState({
-    title: '',
-    owner: '',
-    ownerRole: '',
-    dueDate: '',
-    severity: 'Medium',
-    expectedLag: '',
-    notes: '',
-  });
-  const [actionSubmitting, setActionSubmitting] = useState(false);
-  const [actionSuccess, setActionSuccess] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleStatusChange = async (newStatus: string) => {
     const previousStatus = currentStatus;
@@ -192,37 +224,6 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
     } catch {
       setCurrentStatus(previousStatus);
       toast.error('Failed to update status');
-    }
-  };
-
-  const handleActionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setActionSubmitting(true);
-    setActionError(null);
-    try {
-      const res = await fetch('/api/actions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...actionForm,
-          brandCode: brand,
-          insightId: insight.id,
-          linkedInsight: insight.headline,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setActionSuccess(true);
-      setTimeout(() => {
-        setShowActionModal(false);
-        setActionSuccess(false);
-        setActionForm({ title: '', owner: '', ownerRole: '', dueDate: '', severity: 'Medium', expectedLag: '', notes: '' });
-      }, 1200);
-    } catch {
-      setActionError('Failed to create action. Please try again.');
-      toast.error('Failed to create action. Please try again.');
-    } finally {
-      setActionSubmitting(false);
     }
   };
 
@@ -247,11 +248,13 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
           <h1 className="text-xl font-semibold text-[#0F172A]">{insight.headline}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
-            <UserPlus className="w-4 h-4" />
-            Assign
-          </Button>
-          <Button variant="outline" className="gap-2">
+          {hasMinRole(userRole, 'regional_director') && (
+            <Button variant="outline" className="gap-2" onClick={() => setShowActionModal(true)}>
+              <UserPlus className="w-4 h-4" />
+              Assign
+            </Button>
+          )}
+          <Button variant="outline" className="gap-2" onClick={() => exportInsightSlide(insight)}>
             <Download className="w-4 h-4" />
             Export Slide
           </Button>
@@ -276,6 +279,9 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
         </select>
         <span className="text-xs text-[#94A3B8]">Generated: {formatDate(insight.generatedDate)}</span>
       </div>
+
+      {/* AI Summary */}
+      <AIInsightNarrative insight={insight} />
 
       {/* What Changed */}
       {insight.metricChanges.length > 0 && (
@@ -398,18 +404,65 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
         <DecisionRiskPanel risks={insight.risks.map((r) => r.risk)} />
       )}
 
-      {/* AI Interpretation */}
-      <AIInsightNarrative insight={insight} />
-
       {/* Evidence */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
         <h2 className="text-base font-semibold text-[#0F172A] mb-4">Evidence</h2>
-        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-8 flex items-center justify-center">
-          <div className="text-center text-[#94A3B8]">
-            <div className="text-4xl mb-2">📊</div>
-            <div className="text-sm">Trend charts and detailed analytics</div>
+        {insight.metricChanges.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {insight.metricChanges.map((m) => {
+              // NOTE: Sparkline data is seeded/interpolated from before→after values.
+              // Replace with real time-series from MetricTimeSeries Gold table in future sprint.
+              function seededRandom(seed: string, index: number): number {
+                const hash = seed.split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 1), 0);
+                return ((hash * (index + 1) * 2654435761) % 2 ** 32) / 2 ** 32;
+              }
+              function generateSparklineData(metric: string, before: string, after: string): { value: number }[] {
+                const start = parseFloat(before.replace(/[^0-9.]/g, '')) || 0;
+                const end = parseFloat(after.replace(/[^0-9.]/g, '')) || 0;
+                return Array.from({ length: 6 }, (_, i) => {
+                  const base = start + (end - start) * (i / 5);
+                  const jitter = (seededRandom(metric, i) - 0.5) * Math.abs(end - start) * 0.15;
+                  return { value: Math.round((base + jitter) * 100) / 100 };
+                });
+              }
+              const sparkData = generateSparklineData(m.metric, m.before, m.after);
+              const lineColor = m.direction === 'up' ? '#16A34A' : '#DC2626';
+              return (
+                <div key={m.metric} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold text-[#0F172A] leading-tight">{m.metric}</span>
+                    <span className={`text-[11px] font-medium ${m.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                      {m.direction === 'up' ? '↑' : '↓'}
+                    </span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={48}>
+                    <LineChart data={sparkData}>
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke={lineColor}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-[#94A3B8]">{m.before} → {m.after}</span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${m.direction === 'up' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      {m.changePercent}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        ) : (
+          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-8 flex items-center justify-center">
+            <div className="text-center text-[#94A3B8]">
+              <div className="text-sm">No metric changes recorded</div>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2 mt-4">
           <span className="text-[11px] text-[#94A3B8] font-medium uppercase tracking-wider">Data sources:</span>
           {[...new Set([...(PILLAR_SOURCES[insight.pillar] ?? []), ...insight.metricChanges.map(m => m.metric)])].map((source) => (
@@ -424,10 +477,11 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-[#0F172A]">Recommended Actions</h2>
-          <Button size="sm" className="gap-1.5" onClick={() => setShowActionModal(true)}>
-            <Plus className="w-3.5 h-3.5" />
-            Create Action Item
-          </Button>
+          {hasMinRole(userRole, 'regional_director') && (
+            <Button size="sm" className="gap-1.5" onClick={() => setShowActionModal(true)}>
+              Create Action Item
+            </Button>
+          )}
         </div>
         {insight.actions.length > 0 ? (
           <div className="space-y-3">
@@ -450,165 +504,46 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       {/* Notes & Decisions */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
         <h2 className="text-base font-semibold text-[#0F172A] mb-4">Notes & Decisions</h2>
-        <Tabs defaultValue="timeline">
-          <TabsList>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="discussion">Discussion</TabsTrigger>
-          </TabsList>
-          <TabsContent value="timeline" className="mt-4">
-            <div className="mt-4">
-              <textarea
-                placeholder="Add a note or decision..."
-                className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                rows={3}
-                value={notesValue}
-                onChange={e => setNotesValue(e.target.value)}
-              />
-              <div className="flex items-center gap-2 mt-2">
-                <Button size="sm" onClick={async () => {
-                  try {
-                    const res = await fetch(`/api/insights/${insight.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ notes: notesValue, brandCode }),
-                    });
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    setNotesSaved(true);
-                    setTimeout(() => setNotesSaved(false), 2000);
-                    toast.success('Notes saved');
-                  } catch {
-                    toast.error('Failed to save notes');
-                  }
-                }}>Save Notes</Button>
-                {notesSaved && <span className="text-xs text-[#16A34A]">Saved</span>}
-              </div>
-            </div>
-          </TabsContent>
-          <TabsContent value="discussion" className="mt-4">
-            <p className="text-sm text-[#94A3B8]">No discussions yet.</p>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Create Action Item Modal */}
-      {showActionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowActionModal(false)} />
-          <div role="dialog" aria-modal="true" aria-labelledby="create-action-title" className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 w-full max-w-md mx-4" style={{ boxShadow: '0 8px 40px rgba(15,23,42,0.15)' }}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 id="create-action-title" className="text-base font-semibold text-[#0F172A]">Create Action Item</h3>
-              <button onClick={() => setShowActionModal(false)} className="text-[#CBD5E1] hover:text-[#64748B] transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {actionSuccess ? (
-              <div className="text-center py-6">
-                <div className="text-2xl mb-2">✓</div>
-                <p className="text-sm font-medium text-[#16A34A]">Action item created</p>
-              </div>
-            ) : (
-              <form onSubmit={handleActionSubmit} className="space-y-4">
-                <div>
-                  <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Title</label>
-                  <input
-                    required
-                    type="text"
-                    value={actionForm.title}
-                    onChange={e => setActionForm(f => ({ ...f, title: e.target.value }))}
-                    placeholder="What needs to happen?"
-                    className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Owner</label>
-                    <input
-                      required
-                      type="text"
-                      value={actionForm.owner}
-                      onChange={e => setActionForm(f => ({ ...f, owner: e.target.value }))}
-                      placeholder="Name or team"
-                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Due Date</label>
-                    <input
-                      required
-                      type="date"
-                      value={actionForm.dueDate}
-                      onChange={e => setActionForm(f => ({ ...f, dueDate: e.target.value }))}
-                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Severity</label>
-                    <select
-                      value={actionForm.severity}
-                      onChange={e => setActionForm(f => ({ ...f, severity: e.target.value }))}
-                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                    >
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Expected Lag</label>
-                    <select
-                      value={actionForm.expectedLag}
-                      onChange={e => setActionForm(f => ({ ...f, expectedLag: e.target.value }))}
-                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                    >
-                      <option value="">Select...</option>
-                      <option value="Immediate">Immediate</option>
-                      <option value="1-2 weeks">1–2 weeks</option>
-                      <option value="2-3 weeks">2–3 weeks</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Owner Role <span className="font-normal text-[#94A3B8]">(optional)</span></label>
-                  <input
-                    type="text"
-                    value={actionForm.ownerRole}
-                    onChange={e => setActionForm(f => ({ ...f, ownerRole: e.target.value }))}
-                    placeholder="e.g. Regional Sales Director"
-                    className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Notes <span className="font-normal text-[#94A3B8]">(optional)</span></label>
-                  <textarea
-                    value={actionForm.notes}
-                    onChange={e => setActionForm(f => ({ ...f, notes: e.target.value }))}
-                    placeholder="Additional context or instructions..."
-                    rows={2}
-                    className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors resize-none"
-                  />
-                </div>
-                <div className="text-[11px] text-[#94A3B8] bg-[#F8FAFC] rounded-xl px-3 py-2 border border-[#E2E8F0]">
-                  Linked to: <span className="text-[#334155] font-medium">{insight.headline}</span>
-                </div>
-                {actionError && (
-                  <p className="text-[12px] text-[#DC2626] text-center">{actionError}</p>
-                )}
-                <div className="flex gap-2 pt-1">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => { setShowActionModal(false); setActionError(null); }}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={actionSubmitting}>
-                    {actionSubmitting ? 'Creating...' : 'Create Action'}
-                  </Button>
-                </div>
-              </form>
-            )}
+        <div>
+          <textarea
+            placeholder="Add a note or decision..."
+            className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+            rows={3}
+            value={notesValue}
+            onChange={e => setNotesValue(e.target.value)}
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <Button size="sm" onClick={async () => {
+              try {
+                const res = await fetch(`/api/insights/${insight.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ notes: notesValue, brandCode }),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                setNotesSaved(true);
+                setTimeout(() => setNotesSaved(false), 2000);
+                toast.success('Notes saved');
+              } catch {
+                toast.error('Failed to save notes');
+              }
+            }}>Save Notes</Button>
+            {notesSaved && <span className="text-xs text-[#16A34A]">Saved</span>}
           </div>
         </div>
-      )}
+      </div>
+
+      <CreateActionModal
+        open={showActionModal}
+        onClose={() => setShowActionModal(false)}
+        brandCode={brand || brandCode}
+        prefill={{
+          severity: insight.severity as 'High' | 'Medium' | 'Low',
+          linkedInsight: insight.headline,
+          insightId: insight.id,
+        }}
+        onSuccess={() => setShowActionModal(false)}
+      />
     </div>
   );
 }

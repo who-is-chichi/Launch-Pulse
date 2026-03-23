@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { Prisma, Brand } from '@prisma/client';
 import { logger } from '@/lib/logger';
 import { validateActionBody } from '@/lib/actions-validation';
-import { getOrgId, assertBrandAccess } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, requireRole, getUserId, assertUserBrandAccess } from '@/lib/request-context';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -18,12 +18,13 @@ export async function GET(request: NextRequest) {
   try {
     orgId = getOrgId(request);
     brand = await assertBrandAccess(orgId, brandCode, 'GET /api/actions');
+    await assertUserBrandAccess(getUserId(request), brand.id, request, 'GET /api/actions');
   } catch (err) {
     const httpStatus = (err as { status?: number }).status ?? 401;
     return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
   }
 
-  const where: Prisma.ActionWhereInput = { brandId: brand.id };
+  const where: Prisma.ActionWhereInput = { brandId: brand.id, isActive: true };
   if (status) where.status = status;
 
   const [actions, total] = await prisma.$transaction([
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
     let orgId: string;
     let brand: Brand;
     try {
+      requireRole(request, 'regional_director');
       orgId = getOrgId(request);
       brand = await assertBrandAccess(orgId, brandCode, 'POST /api/actions');
     } catch (err) {

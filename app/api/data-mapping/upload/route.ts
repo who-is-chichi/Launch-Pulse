@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { Brand } from '@prisma/client';
-import { getOrgId, assertBrandAccess, getUserId } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, getUserId, requireRole } from '@/lib/request-context';
 
 interface RuleInput {
   sourceField: string;
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     let orgId: string;
     let brand: Brand;
     try {
+      requireRole(request, 'analytics_manager');
       orgId = getOrgId(request);
       brand = await assertBrandAccess(orgId, brandCode, 'POST /api/data-mapping/upload');
     } catch (err) {

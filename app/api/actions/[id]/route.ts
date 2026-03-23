@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { validateActionPatchBody } from '@/lib/actions-validation';
 import { Brand } from '@prisma/client';
-import { getOrgId, assertBrandAccess } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, requireRole } from '@/lib/request-context';
 
 export async function PATCH(
   request: NextRequest,
@@ -64,6 +64,47 @@ export async function PATCH(
     logger.error('Failed to update action', { route: 'PATCH /api/actions/[id]', error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to update action' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const brandCode = new URL(request.url).searchParams.get('brand') ?? 'ONC-101';
+
+  try {
+    requireRole(request, 'executive');
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: (err as { status?: number }).status ?? 403 });
+  }
+
+  try {
+    let orgId: string;
+    let brand: Brand;
+    try {
+      orgId = getOrgId(request);
+      brand = await assertBrandAccess(orgId, brandCode, 'DELETE /api/actions/[id]');
+    } catch (err) {
+      const httpStatus = (err as { status?: number }).status ?? 401;
+      return NextResponse.json({ error: (err as Error).message }, { status: httpStatus });
+    }
+
+    const existing = await prisma.action.findUnique({ where: { id }, select: { brandId: true, isActive: true } });
+    if (!existing || existing.brandId !== brand.id || !existing.isActive) {
+      return NextResponse.json({ error: 'Action not found' }, { status: 404 });
+    }
+
+    await prisma.action.update({ where: { id }, data: { isActive: false } });
+    logger.info('Action soft-deleted', { route: 'DELETE /api/actions/[id]', id });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    logger.error('Failed to delete action', { route: 'DELETE /api/actions/[id]', error: err instanceof Error ? err.message : String(err) });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to delete action' },
       { status: 500 },
     );
   }

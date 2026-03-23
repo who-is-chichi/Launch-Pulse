@@ -11,6 +11,7 @@ import { Download, FileText, Sparkles, Loader2, X } from 'lucide-react';
 import { useFilters } from '@/components/FilterContext';
 import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
+import { hasMinRole } from '@/lib/roles';
 
 interface KpiTile {
   id: string;
@@ -29,7 +30,7 @@ interface Insight {
   severity: string;
   impact: string;
   region: string;
-  status: string;
+  status?: string;
 }
 
 interface Action {
@@ -67,6 +68,7 @@ interface HomeClientProps {
   dataRunAt?: string | null;
   geographyFallback: boolean;
   selectedGeography: string;
+  userRole?: string;
 }
 
 const PILLAR_COLORS: Record<string, string> = {
@@ -107,7 +109,7 @@ function freshnessColor(freshness: string) {
   return '#DC2626';
 }
 
-export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt, geographyFallback, selectedGeography }: HomeClientProps) {
+export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, actions, datasets, drivers, topInsightRisks, dataRunAt, geographyFallback, selectedGeography, userRole = 'sales_rep' }: HomeClientProps) {
   const { geography, searchQuery } = useFilters();
   const [pulseBrief, setPulseBrief] = useState<string | null>(null);
   const [isBriefLoading, setIsBriefLoading] = useState(false);
@@ -115,6 +117,23 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
   const lastBriefAt = useRef<Map<string, number>>(new Map());
   const COOLDOWN_MS = 30_000;
   const driverData = computeDriverData(drivers);
+
+  const [orgUsers, setOrgUsers] = useState<{ id: string; name: string; role: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/users')
+      .then(r => r.json())
+      .then(data => setOrgUsers(data.users ?? []))
+      .catch(() => {});
+  }, []);
+
+  const [assignInsight, setAssignInsight] = useState<Insight | null>(null);
+  const [suggestions, setSuggestions] = useState<{ title: string; expectedLag: string; notes: string }[]>([]);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState<number | null>(null);
+  const [assignForm, setAssignForm] = useState({ title: '', owner: '', dueDate: '', expectedLag: '', notes: '' });
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [localActions, setLocalActions] = useState(actions);
 
   useEffect(() => {
     if (briefCooldownSecs <= 0) return;
@@ -173,6 +192,79 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
     }
   };
 
+  const handleOpenAssign = (insight: Insight) => {
+    setAssignInsight(insight);
+    setSuggestions([]);
+    setSuggestionsError(null);
+    setSelectedSuggestionIdx(null);
+    setAssignForm({ title: '', owner: '', dueDate: '', expectedLag: '', notes: '' });
+  };
+
+  const handlePopulateWithAI = async () => {
+    if (!assignInsight) return;
+    setIsSuggestionsLoading(true);
+    setSuggestionsError(null);
+    setSuggestions([]);
+    try {
+      const res = await fetch('/api/ai/action-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          headline: assignInsight.headline,
+          pillar: assignInsight.pillar,
+          severity: assignInsight.severity,
+          impact: assignInsight.impact,
+          region: assignInsight.region,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setSuggestions(data.suggestions);
+    } catch (err) {
+      setSuggestionsError(err instanceof Error ? err.message : 'Failed to generate suggestions');
+    } finally {
+      setIsSuggestionsLoading(false);
+    }
+  };
+
+  const handleSelectSuggestion = (idx: number) => {
+    const s = suggestions[idx];
+    setSelectedSuggestionIdx(idx);
+    setAssignForm(f => ({ ...f, title: s.title, expectedLag: s.expectedLag, notes: s.notes }));
+  };
+
+  const handleAssignSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignInsight) return;
+    setAssignSubmitting(true);
+    try {
+      const res = await fetch('/api/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandCode,
+          title: assignForm.title,
+          linkedInsight: assignInsight.headline,
+          owner: assignForm.owner,
+          dueDate: assignForm.dueDate,
+          severity: assignInsight.severity,
+          expectedLag: assignForm.expectedLag,
+          notes: assignForm.notes || null,
+          insightId: assignInsight.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to create action');
+      setLocalActions(prev => [data.action, ...prev]);
+      setAssignInsight(null);
+      toast.success('Action created successfully');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create action');
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {geographyFallback && (
@@ -201,30 +293,36 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => {
-              const a = document.createElement('a');
-              a.href = `/api/export/exec-pack?brand=${encodeURIComponent(brandCode)}&runId=${encodeURIComponent(dataRunId)}`;
-              a.download = `exec-pack-${brandCode}.html`;
-              a.click();
-            }}
-          >
-            <Download className="w-4 h-4" />
-            Export Exec Pack
-          </Button>
-          {briefCooldownSecs > 0 && !isBriefLoading && (
-            <span className="text-[11px] text-[#94A3B8]">Wait {briefCooldownSecs}s</span>
+          {hasMinRole(userRole, 'executive') && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = `/api/export/exec-pack?brand=${encodeURIComponent(brandCode)}&runId=${encodeURIComponent(dataRunId)}`;
+                a.download = `exec-pack-${brandCode}.html`;
+                a.click();
+              }}
+            >
+              <Download className="w-4 h-4" />
+              Export Exec Pack
+            </Button>
           )}
-          <Button className="gap-2" onClick={handlePulseBrief} disabled={isBriefLoading || briefCooldownSecs > 0}>
-            {isBriefLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            {isBriefLoading ? 'Generating...' : 'Generate Pulse Brief'}
-          </Button>
+          {hasMinRole(userRole, 'executive') && (
+            <>
+              {briefCooldownSecs > 0 && !isBriefLoading && (
+                <span className="text-[11px] text-[#94A3B8]">Wait {briefCooldownSecs}s</span>
+              )}
+              <Button className="gap-2" onClick={handlePulseBrief} disabled={isBriefLoading || briefCooldownSecs > 0}>
+                {isBriefLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                {isBriefLoading ? 'Generating...' : 'Generate Pulse Brief'}
+              </Button>
+            </>
+          )}
         </div>
       </motion.div>
 
@@ -296,6 +394,7 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
                   impact: insight.impact,
                   region: insight.region,
                 }}
+                onAssign={hasMinRole(userRole, 'regional_director') ? handleOpenAssign : undefined}
               />
             ))
           ) : (
@@ -348,7 +447,7 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
         >
           <h2 className="text-base font-semibold text-[#0F172A] mb-4">What to Do Next</h2>
           <div className="space-y-3">
-            {actions.map((action) => (
+            {localActions.map((action) => (
               <ActionItem
                 key={action.id}
                 title={action.title}
@@ -384,6 +483,156 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
           </div>
         </div>
       </div>
+
+      {assignInsight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setAssignInsight(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assign-action-title"
+            className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 w-full max-w-md mx-4 overflow-y-auto max-h-[90vh]"
+            style={{ boxShadow: '0 8px 40px rgba(15,23,42,0.15)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 id="assign-action-title" className="text-base font-semibold text-[#0F172A]">Assign Action</h3>
+                <p className="text-xs text-[#94A3B8] mt-0.5 line-clamp-1">{assignInsight.headline}</p>
+              </div>
+              <button
+                onClick={() => setAssignInsight(null)}
+                className="text-[#CBD5E1] hover:text-[#64748B] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 mb-4 border-dashed border-[#BFDBFE] text-[#1D4ED8] hover:bg-[#DBEAFE]"
+              onClick={handlePopulateWithAI}
+              disabled={isSuggestionsLoading}
+            >
+              {isSuggestionsLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Sparkles className="w-3.5 h-3.5" />}
+              {isSuggestionsLoading ? 'Generating suggestions...' : 'Populate with AI'}
+            </Button>
+
+            {suggestionsError && (
+              <p className="text-xs text-red-500 mb-3">{suggestionsError}</p>
+            )}
+
+            {suggestions.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">AI Suggestions — pick one</p>
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(idx)}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition-colors ${
+                      selectedSuggestionIdx === idx
+                        ? 'border-[#1D4ED8] bg-[#EFF6FF] text-[#1D4ED8]'
+                        : 'border-[#E2E8F0] bg-[#F8FAFC] text-[#334155] hover:border-[#93C5FD]'
+                    }`}
+                  >
+                    <span className="font-medium block">{s.title}</span>
+                    <span className="text-[11px] text-[#94A3B8]">{s.notes}</span>
+                  </button>
+                ))}
+                <p className="text-[10px] text-[#CBD5E1]">AI-generated. Review before submitting.</p>
+              </div>
+            )}
+
+            <form onSubmit={handleAssignSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">
+                  Action Title <span className="text-red-400">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Increase rep coverage in T12"
+                  value={assignForm.title}
+                  onChange={e => setAssignForm(f => ({ ...f, title: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">
+                    Owner <span className="text-red-400">*</span>
+                  </label>
+                  {orgUsers.length > 0 ? (
+                    <select
+                      required
+                      value={assignForm.owner}
+                      onChange={e => setAssignForm(f => ({ ...f, owner: e.target.value }))}
+                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+                    >
+                      <option value="">Select owner...</option>
+                      {orgUsers.map(u => <option key={u.id} value={u.name}>{u.name} — {u.role}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      required
+                      type="text"
+                      placeholder="e.g. Jane Smith"
+                      value={assignForm.owner}
+                      onChange={e => setAssignForm(f => ({ ...f, owner: e.target.value }))}
+                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">
+                    Due Date <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    required
+                    type="date"
+                    value={assignForm.dueDate}
+                    onChange={e => setAssignForm(f => ({ ...f, dueDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">Expected Lag</label>
+                <select
+                  value={assignForm.expectedLag}
+                  onChange={e => setAssignForm(f => ({ ...f, expectedLag: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+                >
+                  <option value="">Select lag...</option>
+                  <option>Immediate</option>
+                  <option>1-2 weeks</option>
+                  <option>2-3 weeks</option>
+                </select>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 text-[#94A3B8]"
+                  onClick={() => setAssignInsight(null)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={assignSubmitting}>
+                  {assignSubmitting ? 'Creating...' : 'Create Action'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

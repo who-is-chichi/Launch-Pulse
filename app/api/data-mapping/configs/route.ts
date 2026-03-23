@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { Brand } from '@prisma/client';
-import { getOrgId, assertBrandAccess } from '@/lib/request-context';
+import { getOrgId, assertBrandAccess, requireRole } from '@/lib/request-context';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     let orgId: string;
     let brand: Brand;
     try {
+      requireRole(request, 'analytics_manager');
       orgId = getOrgId(request);
       brand = await assertBrandAccess(orgId, brandCode, 'GET /api/data-mapping/configs');
     } catch (err) {
@@ -40,6 +41,7 @@ export async function PATCH(request: NextRequest) {
     let orgId: string;
     let brand: Brand;
     try {
+      requireRole(request, 'analytics_manager');
       orgId = getOrgId(request);
       brand = await assertBrandAccess(orgId, brandCode, 'PATCH /api/data-mapping/configs');
     } catch (err) {

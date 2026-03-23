@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Activity, BarChart3, Target, Database, Settings, Zap } from 'lucide-react';
+import { hasMinRole } from '@/lib/roles';
 
 const navItems = [
   { path: '/home', label: 'Launch Pulse', icon: Activity },
@@ -13,8 +14,9 @@ const navItems = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
-export default function Sidebar({ lastRunAt }: { lastRunAt?: string }) {
+export default function Sidebar({ lastRunAt, userRole }: { lastRunAt?: string; userRole?: string }) {
   const pathname = usePathname();
+  const visibleItems = navItems.filter(item => !item.admin || hasMinRole(userRole ?? 'sales_rep', 'analytics_manager'));
 
   return (
     <aside className="w-64 bg-white border-r border-[#E2E8F0] flex flex-col" style={{ boxShadow: '1px 0 8px rgba(15, 23, 42, 0.04)' }}>
@@ -38,7 +40,7 @@ export default function Sidebar({ lastRunAt }: { lastRunAt?: string }) {
       </div>
 
       <nav className="flex-1 px-3 py-5 space-y-0.5">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.path);
 

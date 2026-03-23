@@ -1,5 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import DataMappingClient from './DataMappingClient';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { hasMinRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +12,11 @@ export default async function DataMappingPage({
 }: {
   searchParams: Promise<{ brand?: string; timeWindow?: string; geography?: string }>;
 }) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('session')?.value;
+  const session = token ? await verifyToken(token).catch(() => null) : null;
+  if (!session || !hasMinRole(session.role, 'analytics_manager')) redirect('/home');
+
   const { brand: brandCode = 'ONC-101', timeWindow = 'Last 7 days', geography = 'Nation' } = await searchParams;
   const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
 

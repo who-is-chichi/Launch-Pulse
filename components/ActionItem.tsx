@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Target, Clock, User, ArrowRight } from 'lucide-react';
-import { Button } from './ui/button';
+import { Target, Clock, User } from 'lucide-react';
 
 interface ActionItemProps {
   title: string;
@@ -56,12 +55,6 @@ export default function ActionItem({ title, owner, dueDate, expectedLag, linkedI
         )}
       </div>
       
-      <div className="mt-4 pt-4 border-t border-[#F1F5F9]">
-        <Button variant="outline" size="sm" className="w-full gap-2 text-[#1D4ED8] border-[#DBEAFE] hover:bg-[#EFF6FF] hover:border-[#93C5FD]">
-          Create Action Item
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Button>
-      </div>
     </div>
   );
 }
