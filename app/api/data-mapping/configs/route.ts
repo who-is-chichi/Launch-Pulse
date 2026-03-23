@@ -41,6 +41,7 @@ export async function PATCH(request: NextRequest) {
     let orgId: string;
     let brand: Brand;
     try {
+      requireRole(request, 'analytics_manager');
       orgId = getOrgId(request);
       brand = await assertBrandAccess(orgId, brandCode, 'PATCH /api/data-mapping/configs');
     } catch (err) {
