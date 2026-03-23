@@ -10,7 +10,6 @@ import SeverityBadge from '@/components/SeverityBadge';
 import ActionItem from '@/components/ActionItem';
 import DecisionRiskPanel from '@/components/DecisionRiskPanel';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFilters } from '@/components/FilterContext';
 import { INSIGHT_STATUSES } from '@/lib/severity';
 import { toast } from 'sonner';
@@ -110,7 +109,7 @@ function AIInsightNarrative({ insight }: InsightDetailProps) {
             <Sparkles className="w-3.5 h-3.5 text-white" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-[#0F172A]">AI Interpretation</span>
+            <span className="text-sm font-semibold text-[#0F172A]">AI Summary</span>
             <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-[#DBEAFE] to-[#EDE9FE] text-[10px] font-semibold text-[#4338CA] tracking-wide uppercase">Beta</span>
           </div>
         </div>
@@ -277,6 +276,9 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
         <span className="text-xs text-[#94A3B8]">Generated: {formatDate(insight.generatedDate)}</span>
       </div>
 
+      {/* AI Summary */}
+      <AIInsightNarrative insight={insight} />
+
       {/* What Changed */}
       {insight.metricChanges.length > 0 && (
         <motion.div
@@ -398,9 +400,6 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
         <DecisionRiskPanel risks={insight.risks.map((r) => r.risk)} />
       )}
 
-      {/* AI Interpretation */}
-      <AIInsightNarrative insight={insight} />
-
       {/* Evidence */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
         <h2 className="text-base font-semibold text-[#0F172A] mb-4">Evidence</h2>
@@ -450,44 +449,33 @@ export default function InsightDetailClient({ insight, brandCode }: InsightDetai
       {/* Notes & Decisions */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
         <h2 className="text-base font-semibold text-[#0F172A] mb-4">Notes & Decisions</h2>
-        <Tabs defaultValue="timeline">
-          <TabsList>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="discussion">Discussion</TabsTrigger>
-          </TabsList>
-          <TabsContent value="timeline" className="mt-4">
-            <div className="mt-4">
-              <textarea
-                placeholder="Add a note or decision..."
-                className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                rows={3}
-                value={notesValue}
-                onChange={e => setNotesValue(e.target.value)}
-              />
-              <div className="flex items-center gap-2 mt-2">
-                <Button size="sm" onClick={async () => {
-                  try {
-                    const res = await fetch(`/api/insights/${insight.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ notes: notesValue, brandCode }),
-                    });
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    setNotesSaved(true);
-                    setTimeout(() => setNotesSaved(false), 2000);
-                    toast.success('Notes saved');
-                  } catch {
-                    toast.error('Failed to save notes');
-                  }
-                }}>Save Notes</Button>
-                {notesSaved && <span className="text-xs text-[#16A34A]">Saved</span>}
-              </div>
-            </div>
-          </TabsContent>
-          <TabsContent value="discussion" className="mt-4">
-            <p className="text-sm text-[#94A3B8]">No discussions yet.</p>
-          </TabsContent>
-        </Tabs>
+        <div>
+          <textarea
+            placeholder="Add a note or decision..."
+            className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+            rows={3}
+            value={notesValue}
+            onChange={e => setNotesValue(e.target.value)}
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <Button size="sm" onClick={async () => {
+              try {
+                const res = await fetch(`/api/insights/${insight.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ notes: notesValue, brandCode }),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                setNotesSaved(true);
+                setTimeout(() => setNotesSaved(false), 2000);
+                toast.success('Notes saved');
+              } catch {
+                toast.error('Failed to save notes');
+              }
+            }}>Save Notes</Button>
+            {notesSaved && <span className="text-xs text-[#16A34A]">Saved</span>}
+          </div>
+        </div>
       </div>
 
       {/* Create Action Item Modal */}
