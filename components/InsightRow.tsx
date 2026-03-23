@@ -22,9 +22,10 @@ interface InsightRowProps {
   insight: InsightData;
   showActions?: boolean;
   onClick?: () => void;
+  onAssign?: (insight: InsightData) => void;
 }
 
-export default function InsightRow({ insight, showActions = true, onClick }: InsightRowProps) {
+export default function InsightRow({ insight, showActions = true, onClick, onAssign }: InsightRowProps) {
   return (
     <div 
       className="group bg-white border border-[#E2E8F0] rounded-2xl p-5 transition-all duration-300 cursor-pointer hover:-translate-y-0.5"
@@ -54,7 +55,7 @@ export default function InsightRow({ insight, showActions = true, onClick }: Ins
 
         {showActions && (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={e => e.stopPropagation()}>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-[#64748B] hover:text-[#1D4ED8] hover:bg-[#DBEAFE] rounded-lg">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-[#64748B] hover:text-[#1D4ED8] hover:bg-[#DBEAFE] rounded-lg" onClick={() => onAssign?.(insight)}>
               <UserPlus className="w-3.5 h-3.5" />
               Assign
             </Button>
