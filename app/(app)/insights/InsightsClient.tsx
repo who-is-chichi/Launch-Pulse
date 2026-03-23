@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useFilters } from '@/components/FilterContext';
 import AISummaryPanel from '@/components/AISummaryPanel';
+import CreateActionModal from '@/components/CreateActionModal';
 import { exportInsightsToCsv } from '@/lib/export-csv';
 
 interface Insight {
@@ -49,6 +50,7 @@ export default function InsightsClient({
   pillar,
   geographyFallback,
   geography,
+  userRole = 'sales_rep',
 }: {
   initialInsights: Insight[];
   totalCount: number;
@@ -57,6 +59,7 @@ export default function InsightsClient({
   pillar: string;
   geographyFallback: boolean;
   geography: string;
+  userRole?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,6 +68,8 @@ export default function InsightsClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { searchQuery, brand, timeWindow } = useFilters();
   const [isRunning, setIsRunning] = useState(false);
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [actionPrefill, setActionPrefill] = useState<{ title: string; severity: 'High' | 'Medium' | 'Low'; notes: string; linkedInsight: string } | null>(null);
   const totalPages = Math.ceil(totalCount / pageSize);
 
   useEffect(() => {
@@ -231,7 +236,14 @@ export default function InsightsClient({
         </Button>
       </div>
 
-      <AISummaryPanel insights={summaryInsights} />
+      <AISummaryPanel
+        insights={summaryInsights}
+        userRole={userRole}
+        onCreateAction={(prefill) => {
+          setActionPrefill(prefill);
+          setShowActionModal(true);
+        }}
+      />
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -348,6 +360,14 @@ export default function InsightsClient({
           </Button>
         </div>
       </div>
+
+      <CreateActionModal
+        open={showActionModal}
+        onClose={() => setShowActionModal(false)}
+        brandCode={brand}
+        prefill={actionPrefill ?? undefined}
+        onSuccess={() => setShowActionModal(false)}
+      />
     </div>
   );
 }

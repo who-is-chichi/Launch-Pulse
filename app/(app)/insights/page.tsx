@@ -1,6 +1,8 @@
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sortBySeverityDesc } from '@/lib/severity';
 import InsightsClient from './InsightsClient';
+import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,11 @@ export default async function InsightsPage({
     ? pillarParam
     : undefined;
   const page = Math.max(1, parseInt(pageParam ?? '1', 10));
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value ?? '';
+  const payload = token ? await verifyToken(token) : null;
+  const userRole = payload?.role ?? 'sales_rep';
 
   const brand = await prisma.brand.findUnique({ where: { code: brandCode } });
 
@@ -65,6 +72,7 @@ export default async function InsightsPage({
       pillar={pillar ?? ''}
       geographyFallback={geographyFallback}
       geography={geography}
+      userRole={userRole}
     />
   );
 }
