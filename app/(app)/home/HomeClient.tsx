@@ -116,6 +116,14 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
   const COOLDOWN_MS = 30_000;
   const driverData = computeDriverData(drivers);
 
+  const [orgUsers, setOrgUsers] = useState<{ id: string; name: string; role: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/users')
+      .then(r => r.json())
+      .then(data => setOrgUsers(data.users ?? []))
+      .catch(() => {});
+  }, []);
+
   const [assignInsight, setAssignInsight] = useState<Insight | null>(null);
   const [suggestions, setSuggestions] = useState<{ title: string; expectedLag: string; notes: string }[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
@@ -553,14 +561,26 @@ export default function HomeClient({ brandCode, dataRunId, kpiTiles, insights, a
                   <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">
                     Owner <span className="text-red-400">*</span>
                   </label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="e.g. Jane Smith"
-                    value={assignForm.owner}
-                    onChange={e => setAssignForm(f => ({ ...f, owner: e.target.value }))}
-                    className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
-                  />
+                  {orgUsers.length > 0 ? (
+                    <select
+                      required
+                      value={assignForm.owner}
+                      onChange={e => setAssignForm(f => ({ ...f, owner: e.target.value }))}
+                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+                    >
+                      <option value="">Select owner...</option>
+                      {orgUsers.map(u => <option key={u.id} value={u.name}>{u.name} — {u.role}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      required
+                      type="text"
+                      placeholder="e.g. Jane Smith"
+                      value={assignForm.owner}
+                      onChange={e => setAssignForm(f => ({ ...f, owner: e.target.value }))}
+                      className="w-full px-3 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20 focus:border-[#93C5FD] bg-[#F8FAFC] focus:bg-white transition-colors"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">
