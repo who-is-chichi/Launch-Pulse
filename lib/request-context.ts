@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Brand } from '@prisma/client';
 import { logger } from '@/lib/logger';
+import { ROLE_HIERARCHY } from '@/lib/roles';
 
 export function getOrgId(request: NextRequest): string {
   const orgId = request.headers.get('x-org-id');
@@ -13,11 +14,24 @@ export function getOrgId(request: NextRequest): string {
 }
 
 export function getUserId(request: NextRequest): string {
-  return request.headers.get('x-user-id') ?? '';
+  const userId = request.headers.get('x-user-id');
+  if (!userId) throw Object.assign(new Error('Unauthorized'), { status: 401 });
+  return userId;
 }
 
 export function getUserRole(request: NextRequest): string {
   return request.headers.get('x-user-role') ?? '';
+}
+
+/**
+ * Throws 403 if the requesting user's role is below the minimum required level.
+ */
+export function requireRole(request: NextRequest, minRole: string): void {
+  const role = getUserRole(request);
+  if (!role) throw Object.assign(new Error('Unauthorized'), { status: 401 });
+  if ((ROLE_HIERARCHY[role] ?? 0) < (ROLE_HIERARCHY[minRole] ?? 999)) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 });
+  }
 }
 
 /**
