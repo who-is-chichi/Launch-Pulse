@@ -367,7 +367,7 @@ export default function AISummaryPanel({ insights, onCreateAction, userRole }: A
                           <div className="mt-3 pt-3 border-t border-[#F1F5F9]">
                             <button
                               className="text-[11px] font-semibold text-[#1D4ED8] hover:text-[#1E40AF] transition-colors flex items-center gap-1"
-                              onClick={() => onCreateAction?.({ title: pair.action.action, severity: pair.impact.severity, notes: pair.action.rationale, linkedInsight: insights[0]?.headline ?? '' })}
+                              onClick={() => onCreateAction?.({ title: pair.action.action, severity: pair.impact.severity, notes: pair.action.rationale, linkedInsight: insights.find(i => i.pillar === pair.impact.pillar)?.headline ?? insights[0]?.headline ?? '' })}
                             >
                               Create Action Item
                               <ArrowRight className="w-3 h-3" />

@@ -115,7 +115,7 @@ export default function BulkAssignModal({
           <h3 id="bulk-assign-title" className="text-base font-semibold text-[#0F172A]">
             Bulk Assign Actions
           </h3>
-          <button onClick={onClose} className="text-[#CBD5E1] hover:text-[#64748B] transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-[#CBD5E1] hover:text-[#64748B] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>

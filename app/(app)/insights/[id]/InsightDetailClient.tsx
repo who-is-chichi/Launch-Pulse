@@ -157,14 +157,18 @@ const statusColors: Record<string, string> = {
   Monitoring: 'bg-[#F5F3FF] text-[#5B21B6] border-[#DDD6FE]',
 };
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+
 function exportInsightSlide(insight: InsightDetailProps['insight']) {
   const metricRows = insight.metricChanges.map(m =>
-    `<tr><td>${m.metric}</td><td>${m.before}</td><td>${m.after}</td><td style="color:${m.direction==='up'?'#16A34A':'#DC2626'}">${m.changePercent}</td></tr>`
+    `<tr><td>${escapeHtml(m.metric)}</td><td>${escapeHtml(m.before)}</td><td>${escapeHtml(m.after)}</td><td style="color:${m.direction==='up'?'#16A34A':'#DC2626'}">${escapeHtml(m.changePercent)}</td></tr>`
   ).join('');
   const driverList = insight.drivers.slice(0, 3).map(d =>
-    `<li><strong>${d.label}</strong> — ${d.description} (${d.confidence}% confidence)</li>`
+    `<li><strong>${escapeHtml(d.label)}</strong> — ${escapeHtml(d.description)} (${d.confidence}% confidence)</li>`
   ).join('');
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${insight.headline}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(insight.headline)}</title>
 <style>body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;color:#0F172A;padding:0 20px}
 h1{font-size:1.5rem;margin-bottom:4px}
 .meta{display:flex;gap:12px;margin-bottom:24px;font-size:.875rem;color:#64748B}
@@ -175,9 +179,9 @@ ul{margin:12px 0;padding-left:20px}li{margin-bottom:8px}
 .section{margin-bottom:28px}.section h2{font-size:1rem;font-weight:600;margin-bottom:12px;color:#1E40AF}
 .footer{margin-top:40px;font-size:.75rem;color:#94A3B8;border-top:1px solid #E2E8F0;padding-top:12px}
 </style></head><body>
-<h1>${insight.headline}</h1>
-<div class="meta"><span>Pillar: ${insight.pillar}</span><span>Severity: ${insight.severity}</span><span>Region: ${insight.region}</span><span>Generated: ${new Date(insight.generatedDate).toLocaleDateString()}</span></div>
-<div class="section"><h2>Impact</h2><p>${insight.impact}</p></div>
+<h1>${escapeHtml(insight.headline)}</h1>
+<div class="meta"><span>Pillar: ${escapeHtml(insight.pillar)}</span><span>Severity: ${escapeHtml(insight.severity)}</span><span>Region: ${escapeHtml(insight.region)}</span><span>Generated: ${new Date(insight.generatedDate).toLocaleDateString()}</span></div>
+<div class="section"><h2>Impact</h2><p>${escapeHtml(insight.impact)}</p></div>
 ${metricRows ? `<div class="section"><h2>Metric Changes</h2><table><thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Change</th></tr></thead><tbody>${metricRows}</tbody></table></div>` : ''}
 ${driverList ? `<div class="section"><h2>Key Drivers</h2><ul>${driverList}</ul></div>` : ''}
 <div class="footer">Exported from Launch Pulse · ${new Date().toLocaleDateString()}</div>
@@ -473,9 +477,11 @@ export default function InsightDetailClient({
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-[#0F172A]">Recommended Actions</h2>
-          <Button size="sm" className="gap-1.5" onClick={() => setShowActionModal(true)}>
-            Create Action Item
-          </Button>
+          {hasMinRole(userRole, 'regional_director') && (
+            <Button size="sm" className="gap-1.5" onClick={() => setShowActionModal(true)}>
+              Create Action Item
+            </Button>
+          )}
         </div>
         {insight.actions.length > 0 ? (
           <div className="space-y-3">

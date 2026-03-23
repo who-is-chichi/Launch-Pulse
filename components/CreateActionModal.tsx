@@ -100,7 +100,7 @@ export default function CreateActionModal({
       >
         <div className="flex items-center justify-between mb-5">
           <h3 id="create-action-title" className="text-base font-semibold text-[#0F172A]">Create Action Item</h3>
-          <button onClick={onClose} className="text-[#CBD5E1] hover:text-[#64748B] transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-[#CBD5E1] hover:text-[#64748B] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
